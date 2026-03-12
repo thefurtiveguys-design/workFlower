@@ -1,4 +1,4 @@
-// js/app.js
+// app.js
 
 // Configuration Supabase
 const SUPABASE_URL = 'https://ylrseemuvxogyopwqrnr.supabase.co';
@@ -22,8 +22,8 @@ const logoutLink = document.getElementById('logout-link');
 const searchIcon = document.getElementById('search-icon');
 const searchInput = document.getElementById('search-input');
 const authToggle = document.getElementById('auth-toggle');
-const authSubmit = document.getElementById('auth-submit');
 const authForm = document.getElementById('auth-form');
+const authSubmit = document.getElementById('auth-submit');
 const authMessage = document.getElementById('auth-message');
 const createForm = document.getElementById('create-project-form');
 const createMessage = document.getElementById('create-message');
@@ -35,7 +35,7 @@ const navLinks = document.querySelectorAll('.nav-links a');
 // ===== INITIALISATION =====
 async function init() {
     await checkUser();
-    loadData();
+    await loadData();
     setupRealtime();
     setupEventListeners();
     renderHomePage();
@@ -67,14 +67,14 @@ async function loadData() {
         .select('*')
         .order('created_at', { ascending: false });
     if (error) console.error(error);
-    else allPosts = posts;
+    else allPosts = posts || [];
 
     // Contributions
     const { data: contribs } = await supabase
         .from('contributions')
         .select('*')
         .order('created_at', { ascending: false });
-    if (contribs) allContributions = contribs;
+    allContributions = contribs || [];
 
     // Calculer totaux par projet
     allPosts = allPosts.map(post => {
@@ -91,11 +91,19 @@ function setupRealtime() {
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'contributions' }, payload => {
             const newContrib = payload.new;
             allContributions.unshift(newContrib);
-            // Mise à jour du ticker, des top donateurs, et de la page courante
+            
+            // Mettre à jour le post concerné
+            const postIndex = allPosts.findIndex(p => p.id === newContrib.post_id);
+            if (postIndex !== -1) {
+                allPosts[postIndex].total = (allPosts[postIndex].total || 0) + parseFloat(newContrib.amount);
+                allPosts[postIndex].contributors = allPosts[postIndex].contributors || [];
+                allPosts[postIndex].contributors.unshift(newContrib);
+            }
+            
             updateTicker();
             updateTopDonors();
             if (document.querySelector('.feed')) {
-                renderFeed(); // rafraîchir le feed si on est sur l'accueil
+                renderHomePage();
             }
             showNotification(newContrib);
         })
@@ -111,6 +119,21 @@ function showNotification(contrib) {
     toast.innerHTML = `<i class="fas fa-gift"></i> <span>${name} a soutenu ${project.title} avec ${contrib.amount}€</span>`;
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3000);
+}
+
+function updateTicker() {
+    const ticker = document.querySelector('.ticker-content');
+    if (ticker) {
+        ticker.innerHTML = renderTicker();
+    }
+}
+
+function updateTopDonors() {
+    const topDonors = renderTopDonors();
+    const mobileContainer = document.querySelector('.top-donors-mobile');
+    const desktopContainer = document.querySelector('.top-donors-desktop');
+    if (mobileContainer) mobileContainer.innerHTML = topDonors.mobile;
+    if (desktopContainer) desktopContainer.innerHTML = `<div class="top-donors-title">🏆 TOP DONATEURS</div>${topDonors.desktop}`;
 }
 
 // ===== RENDU ACCUEIL =====
@@ -152,13 +175,20 @@ function renderHomePage() {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const postId = btn.closest('.feed-card').dataset.id;
-            // Ouvrir modal de don ou rediriger vers page projet avec formulaire
             alert('Fonctionnalité de don à implémenter avec PayPal');
+        });
+    });
+
+    document.querySelectorAll('.story').forEach(story => {
+        story.addEventListener('click', () => {
+            const postId = story.dataset.id;
+            showProjectPage(postId);
         });
     });
 }
 
 function renderStories() {
+    if (!allPosts.length) return '<div class="story"><div class="story-avatar"><div class="story-avatar-inner">?</div></div><div class="story-title">Aucun projet</div></div>';
     return allPosts.slice(0, 8).map(post => {
         const progress = post.target_amount ? Math.min((post.total / post.target_amount) * 100, 100) : 0;
         return `
@@ -174,8 +204,8 @@ function renderStories() {
 }
 
 function renderTicker() {
+    if (!allContributions.length) return '<span class="ticker-item"><i class="fas fa-bolt"></i> Aucun don pour le moment</span>';
     const recent = allContributions.slice(0, 20);
-    // On duplique pour l'animation
     return recent.map(c => {
         const name = c.contributor_name || 'Anonyme';
         return `<span class="ticker-item"><i class="fas fa-bolt"></i> ${name} • ${c.amount}€</span>`;
@@ -186,7 +216,6 @@ function renderTicker() {
 }
 
 function renderTopDonors() {
-    // Calculer totaux par contributeur
     const totals = {};
     allContributions.forEach(c => {
         const name = c.contributor_name || 'Anonyme';
@@ -219,6 +248,7 @@ function renderTopDonors() {
 }
 
 function renderFeed() {
+    if (!allPosts.length) return '<div class="feed-card"><div class="card-overlay"><p>Aucun projet pour le moment</p></div></div>';
     return allPosts.map(post => {
         const progress = post.target_amount ? Math.min((post.total / post.target_amount) * 100, 100) : 0;
         const daysLeft = post.created_at ? Math.max(0, 30 - Math.floor((new Date() - new Date(post.created_at)) / (1000*3600*24))) : '∞';
@@ -313,157 +343,153 @@ function showProjectPage(postId) {
 }
 
 // ===== AUTH =====
-loginIcon.addEventListener('click', () => {
-    authModal.classList.remove('hidden');
-    isLoginMode = true;
-    document.getElementById('auth-modal-title').textContent = 'Connexion';
-    authSubmit.textContent = 'Se connecter';
-    authMessage.textContent = '';
-});
-
-userIcon.addEventListener('click', () => {
-    userDropdown.classList.toggle('hidden');
-});
-
-logoutLink.addEventListener('click', async (e) => {
-    e.preventDefault();
-    await supabase.auth.signOut();
-    currentUser = null;
-    updateUIForUser();
-    renderHomePage();
-});
-
-closeAuth.addEventListener('click', () => {
-    authModal.classList.add('hidden');
-});
-
-authToggle.addEventListener('click', () => {
-    isLoginMode = !isLoginMode;
-    if (isLoginMode) {
+function setupEventListeners() {
+    if (loginIcon) loginIcon.addEventListener('click', () => {
+        authModal.classList.remove('hidden');
+        isLoginMode = true;
         document.getElementById('auth-modal-title').textContent = 'Connexion';
         authSubmit.textContent = 'Se connecter';
-    } else {
-        document.getElementById('auth-modal-title').textContent = 'Inscription';
-        authSubmit.textContent = 'S\'inscrire';
-    }
-    authMessage.textContent = '';
-});
+        authMessage.textContent = '';
+    });
 
-authForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('auth-email').value.trim();
-    const password = document.getElementById('auth-password').value;
+    if (userIcon) userIcon.addEventListener('click', () => {
+        userDropdown.classList.toggle('hidden');
+    });
 
-    let result;
-    if (isLoginMode) {
-        result = await supabase.auth.signInWithPassword({ email, password });
-    } else {
-        result = await supabase.auth.signUp({ email, password });
-    }
+    if (logoutLink) logoutLink.addEventListener('click', async (e) => {
+        e.preventDefault();
+        await supabase.auth.signOut();
+        currentUser = null;
+        updateUIForUser();
+        renderHomePage();
+    });
 
-    if (result.error) {
-        authMessage.textContent = result.error.message;
-        authMessage.style.color = 'var(--danger)';
-    } else {
+    if (closeAuth) closeAuth.addEventListener('click', () => {
+        authModal.classList.add('hidden');
+    });
+
+    if (authToggle) authToggle.addEventListener('click', () => {
+        isLoginMode = !isLoginMode;
         if (isLoginMode) {
-            currentUser = result.data.user;
-            authModal.classList.add('hidden');
-            updateUIForUser();
-            renderHomePage();
+            document.getElementById('auth-modal-title').textContent = 'Connexion';
+            authSubmit.textContent = 'Se connecter';
         } else {
-            authMessage.textContent = 'Inscription réussie ! Vérifiez votre email.';
-            authMessage.style.color = 'var(--success)';
+            document.getElementById('auth-modal-title').textContent = 'Inscription';
+            authSubmit.textContent = 'S\'inscrire';
         }
-    }
-});
+        authMessage.textContent = '';
+    });
 
-// ===== CRÉATION PROJET =====
-document.querySelectorAll('[data-page="create"]').forEach(el => {
-    el.addEventListener('click', (e) => {
+    if (authForm) authForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (!currentUser) {
-            authModal.classList.remove('hidden');
-            return;
+        const email = document.getElementById('auth-email').value.trim();
+        const password = document.getElementById('auth-password').value;
+
+        let result;
+        if (isLoginMode) {
+            result = await supabase.auth.signInWithPassword({ email, password });
+        } else {
+            result = await supabase.auth.signUp({ email, password });
         }
-        createModal.classList.remove('hidden');
+
+        if (result.error) {
+            authMessage.textContent = result.error.message;
+            authMessage.style.color = 'var(--danger)';
+        } else {
+            if (isLoginMode) {
+                currentUser = result.data.user;
+                authModal.classList.add('hidden');
+                updateUIForUser();
+                renderHomePage();
+            } else {
+                authMessage.textContent = 'Inscription réussie ! Vérifiez votre email.';
+                authMessage.style.color = 'var(--success)';
+            }
+        }
     });
-});
 
-closeCreate.addEventListener('click', () => {
-    createModal.classList.add('hidden');
-});
-
-createForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!currentUser) return;
-
-    const title = document.getElementById('project-title').value;
-    const description = document.getElementById('project-description').value;
-    const target = parseFloat(document.getElementById('project-target').value);
-    const paypal = document.getElementById('project-paypal').value;
-
-    const { error } = await supabase.from('posts').insert([
-        {
-            user_id: currentUser.id,
-            title,
-            description,
-            target_amount: target,
-            paypal_email: paypal,
-        }
-    ]);
-
-    if (error) {
-        createMessage.textContent = error.message;
-        createMessage.style.color = 'var(--danger)';
-    } else {
-        createMessage.textContent = 'Projet créé avec succès !';
-        createMessage.style.color = 'var(--success)';
-        setTimeout(() => {
-            createModal.classList.add('hidden');
-            loadData().then(() => renderHomePage());
-        }, 1500);
-    }
-});
-
-// ===== RECHERCHE =====
-searchIcon.addEventListener('click', () => {
-    searchInput.classList.toggle('expanded');
-    if (searchInput.classList.contains('expanded')) searchInput.focus();
-});
-
-searchInput.addEventListener('input', () => {
-    // Filtrage à implémenter
-});
-
-// ===== NAVIGATION =====
-bottomNavIcons.forEach(icon => {
-    icon.addEventListener('click', () => {
-        bottomNavIcons.forEach(i => i.classList.remove('active'));
-        icon.classList.add('active');
-        const page = icon.dataset.page;
-        if (page === 'home') renderHomePage();
-        else if (page === 'create') {
-            if (!currentUser) authModal.classList.remove('hidden');
-            else createModal.classList.remove('hidden');
-        }
-        // Autres pages...
+    // Création projet
+    document.querySelectorAll('[data-page="create"]').forEach(el => {
+        el.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (!currentUser) {
+                authModal.classList.remove('hidden');
+                return;
+            }
+            createModal.classList.remove('hidden');
+        });
     });
-});
 
-navLinks.forEach(link => {
-    link.addEventListener('click', (e) => {
+    if (closeCreate) closeCreate.addEventListener('click', () => {
+        createModal.classList.add('hidden');
+    });
+
+    if (createForm) createForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        navLinks.forEach(l => l.classList.remove('active'));
-        link.classList.add('active');
-        const page = link.dataset.page;
-        if (page === 'home') renderHomePage();
-        else if (page === 'create') {
-            if (!currentUser) authModal.classList.remove('hidden');
-            else createModal.classList.remove('hidden');
+        if (!currentUser) return;
+
+        const title = document.getElementById('project-title').value;
+        const description = document.getElementById('project-description').value;
+        const target = parseFloat(document.getElementById('project-target').value);
+        const paypal = document.getElementById('project-paypal').value;
+
+        const { error } = await supabase.from('posts').insert([
+            {
+                user_id: currentUser.id,
+                title,
+                description,
+                target_amount: target,
+                paypal_email: paypal,
+            }
+        ]);
+
+        if (error) {
+            createMessage.textContent = error.message;
+            createMessage.style.color = 'var(--danger)';
+        } else {
+            createMessage.textContent = 'Projet créé avec succès !';
+            createMessage.style.color = 'var(--success)';
+            setTimeout(() => {
+                createModal.classList.add('hidden');
+                loadData().then(() => renderHomePage());
+            }, 1500);
         }
     });
-});
+
+    // Recherche
+    if (searchIcon) searchIcon.addEventListener('click', () => {
+        searchInput.classList.toggle('expanded');
+        if (searchInput.classList.contains('expanded')) searchInput.focus();
+    });
+
+    // Navigation
+    bottomNavIcons.forEach(icon => {
+        icon.addEventListener('click', () => {
+            bottomNavIcons.forEach(i => i.classList.remove('active'));
+            icon.classList.add('active');
+            const page = icon.dataset.page;
+            if (page === 'home') renderHomePage();
+            else if (page === 'create') {
+                if (!currentUser) authModal.classList.remove('hidden');
+                else createModal.classList.remove('hidden');
+            }
+        });
+    });
+
+    navLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            navLinks.forEach(l => l.classList.remove('active'));
+            link.classList.add('active');
+            const page = link.dataset.page;
+            if (page === 'home') renderHomePage();
+            else if (page === 'create') {
+                if (!currentUser) authModal.classList.remove('hidden');
+                else createModal.classList.remove('hidden');
+            }
+        });
+    });
+}
 
 // Démarrer
 init();
-
