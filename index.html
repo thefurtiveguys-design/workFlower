@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>Muscle Tracker · Supabase actif</title>
+    <title>Muscle Tracker · Connexion Email</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&family=Poppins:wght@500;600&display=swap" rel="stylesheet">
@@ -15,7 +15,64 @@
         body { font-family: 'Inter', sans-serif; background: #f4f6fa; }
         .font-poppins { font-family: 'Poppins', sans-serif; }
         .bottom-nav-item.active i, .bottom-nav-item.active span { color: #4f46e5; font-weight: 600; }
-        .error-message { background: #fee2e2; color: #b91c1c; }
+        .auth-container {
+            background: white;
+            border-radius: 1.5rem;
+            padding: 2rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+        }
+        .auth-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+        .auth-input:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+        .auth-button {
+            width: 100%;
+            padding: 0.75rem;
+            background: #4f46e5;
+            color: white;
+            font-weight: 600;
+            border-radius: 0.75rem;
+            transition: all 0.2s;
+        }
+        .auth-button:hover {
+            background: #4338ca;
+            transform: translateY(-1px);
+        }
+        .auth-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .switch-auth {
+            color: #4f46e5;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .switch-auth:hover {
+            text-decoration: underline;
+        }
+        .message {
+            padding: 0.75rem;
+            border-radius: 0.75rem;
+            font-size: 0.875rem;
+            margin-top: 1rem;
+        }
+        .message.error {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+        .message.success {
+            background: #dcfce7;
+            color: #166534;
+        }
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-3">
@@ -25,16 +82,16 @@
         <!-- Header -->
         <div class="px-5 pt-6 pb-2 border-b border-gray-100 flex items-center justify-between">
             <h1 class="text-xl font-poppins font-semibold text-gray-800"><i class="fas fa-dumbbell text-indigo-500 mr-2"></i>Muscle Tracker</h1>
-            <div class="bg-indigo-50 px-3 py-1 rounded-full text-xs font-medium text-indigo-700 shadow-sm flex items-center gap-1">
-                <i class="fas fa-bolt text-xs"></i> <span id="levelBadge">novice</span>
+            <div id="authStatus" class="bg-indigo-50 px-3 py-1 rounded-full text-xs font-medium text-indigo-700 shadow-sm hidden">
+                <i class="fas fa-circle text-xs text-green-500 mr-1"></i> <span id="userEmailDisplay"></span>
             </div>
         </div>
 
         <!-- Contenu principal -->
         <div id="appContent" class="p-5 pb-24 transition-opacity duration-200"></div>
 
-        <!-- Bottom navigation -->
-        <div class="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-200 flex justify-around py-2 px-4 text-xs text-gray-500">
+        <!-- Bottom navigation (caché si non connecté) -->
+        <div id="bottomNav" class="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-200 flex justify-around py-2 px-4 text-xs text-gray-500 hidden">
             <div class="bottom-nav-item flex flex-col items-center cursor-pointer active" data-view="dashboard"><i class="fas fa-home text-xl mb-0.5"></i><span>Accueil</span></div>
             <div class="bottom-nav-item flex flex-col items-center cursor-pointer" data-view="add"><i class="fas fa-plus-circle text-xl mb-0.5"></i><span>Ajouter</span></div>
             <div class="bottom-nav-item flex flex-col items-center cursor-pointer" data-view="progress"><i class="fas fa-chart-line text-xl mb-0.5"></i><span>Progrès</span></div>
@@ -44,16 +101,19 @@
 
     <script>
         (async function() {
-            // ========== CONFIG SUPABASE (vos identifiants) ==========
+            // ========== CONFIG SUPABASE ==========
             const SUPABASE_URL = 'https://ylrseemuvxogyopwqrnr.supabase.co';
             const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlscnNlZW11dnhvZ3lvcHdycW5yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1NDA1MzIsImV4cCI6MjA4ODExNjUzMn0.Bc1yhbVNbLGU_bMQBjecXe0Is-WtZMWXALcW-oWYkPA';
 
-            // Initialisation Supabase
             const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-                auth: { persistSession: true }
+                auth: {
+                    persistSession: true,
+                    autoRefreshToken: true,
+                    detectSessionInUrl: true
+                }
             });
 
-            // ========== MOYENNES NATIONALES (24 exercices) ==========
+            // ========== MOYENNES NATIONALES ==========
             const NATIONAL_AVERAGES = {
                 squat: { male: 105, female: 62 },
                 bench: { male: 82, female: 42 },
@@ -113,56 +173,197 @@
                 profile: null,
                 performances: [],
                 currentView: 'dashboard',
-                chartInstance: null
+                chartInstance: null,
+                isAuthenticated: false
             };
 
             const contentDiv = document.getElementById('appContent');
             const navItems = document.querySelectorAll('.bottom-nav-item');
-            const levelSpan = document.getElementById('levelBadge');
+            const bottomNav = document.getElementById('bottomNav');
+            const authStatus = document.getElementById('authStatus');
+            const userEmailDisplay = document.getElementById('userEmailDisplay');
 
-            // ========== FONCTIONS AUTH & DONNÉES (avec gestion d'erreur visible) ==========
-            async function initAuth() {
-                try {
-                    const { data: { session } } = await supabase.auth.getSession();
-                    if (session?.user) {
-                        state.user = session.user;
-                        console.log('Utilisateur connecté (session):', state.user.id);
-                    } else {
-                        console.log('Tentative de connexion anonyme...');
-                        const { data, error } = await supabase.auth.signInAnonymously();
-                        if (error) {
-                            console.error('Erreur auth anonyme:', error);
-                            alert('Erreur d\'authentification. Utilisation du mode local (les données ne seront pas sauvegardées en ligne).');
-                            state.user = { id: 'local-' + Math.random().toString(36) };
-                        } else {
-                            state.user = data.user;
-                            console.log('Auth anonyme réussie:', state.user.id);
-                        }
-                    }
+            // ========== GESTION DE L'AUTHENTIFICATION ==========
+            
+            // Vérifier la session au chargement
+            async function checkSession() {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (session?.user) {
+                    state.user = session.user;
+                    state.isAuthenticated = true;
+                    authStatus.classList.remove('hidden');
+                    userEmailDisplay.textContent = session.user.email || 'Connecté';
+                    bottomNav.classList.remove('hidden');
                     await loadProfile();
                     await loadPerformances();
-                } catch (e) {
-                    console.error('Exception initAuth:', e);
-                    alert('Erreur de connexion à Supabase. Vérifiez votre clé API et votre connexion internet.');
-                    state.user = { id: 'local-' + Math.random().toString(36) };
-                    state.profile = { sex: 'female', age: 28, weight: 62, goal: 'Progresser' };
-                } finally {
                     renderView(state.currentView);
+                } else {
+                    renderAuth();
                 }
             }
 
+            // Afficher l'écran de connexion/inscription
+            function renderAuth() {
+                state.isAuthenticated = false;
+                authStatus.classList.add('hidden');
+                bottomNav.classList.add('hidden');
+                
+                contentDiv.innerHTML = `
+                    <div class="auth-container">
+                        <h2 class="text-2xl font-poppins font-semibold text-gray-800 mb-2 text-center">Bienvenue !</h2>
+                        <p class="text-gray-500 text-center mb-6">Connectez-vous pour suivre vos performances</p>
+                        
+                        <div id="authMessage" class="message hidden"></div>
+                        
+                        <form id="loginForm" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                <input type="email" id="email" class="auth-input" placeholder="votre@email.com" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Mot de passe</label>
+                                <input type="password" id="password" class="auth-input" placeholder="••••••••" required>
+                            </div>
+                            <button type="submit" class="auth-button" id="submitBtn">Se connecter</button>
+                        </form>
+                        
+                        <p class="text-center mt-4 text-sm text-gray-600">
+                            Pas encore de compte ? 
+                            <span class="switch-auth" onclick="switchToSignup()">Créer un compte</span>
+                        </p>
+                    </div>
+                `;
+
+                // Rendre la fonction disponible globalement
+                window.switchToSignup = function() {
+                    renderSignup();
+                };
+
+                document.getElementById('loginForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const email = document.getElementById('email').value;
+                    const password = document.getElementById('password').value;
+                    const submitBtn = document.getElementById('submitBtn');
+                    const messageDiv = document.getElementById('authMessage');
+                    
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Connexion...';
+                    
+                    const { data, error } = await supabase.auth.signInWithPassword({
+                        email: email,
+                        password: password
+                    });
+                    
+                    if (error) {
+                        messageDiv.classList.remove('hidden', 'success');
+                        messageDiv.classList.add('error');
+                        messageDiv.textContent = error.message;
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Se connecter';
+                    } else {
+                        messageDiv.classList.remove('hidden', 'error');
+                        messageDiv.classList.add('success');
+                        messageDiv.textContent = 'Connexion réussie ! Redirection...';
+                        setTimeout(() => {
+                            checkSession();
+                        }, 1000);
+                    }
+                });
+            }
+
+            function renderSignup() {
+                contentDiv.innerHTML = `
+                    <div class="auth-container">
+                        <h2 class="text-2xl font-poppins font-semibold text-gray-800 mb-2 text-center">Créer un compte</h2>
+                        <p class="text-gray-500 text-center mb-6">Inscrivez-vous pour commencer</p>
+                        
+                        <div id="authMessage" class="message hidden"></div>
+                        
+                        <form id="signupForm" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                <input type="email" id="email" class="auth-input" placeholder="votre@email.com" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Mot de passe</label>
+                                <input type="password" id="password" class="auth-input" placeholder="•••••••• (min. 6 caractères)" required>
+                            </div>
+                            <button type="submit" class="auth-button" id="submitBtn">Créer un compte</button>
+                        </form>
+                        
+                        <p class="text-center mt-4 text-sm text-gray-600">
+                            Déjà un compte ? 
+                            <span class="switch-auth" onclick="switchToLogin()">Se connecter</span>
+                        </p>
+                    </div>
+                `;
+
+                window.switchToLogin = function() {
+                    renderAuth();
+                };
+
+                document.getElementById('signupForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const email = document.getElementById('email').value;
+                    const password = document.getElementById('password').value;
+                    const submitBtn = document.getElementById('submitBtn');
+                    const messageDiv = document.getElementById('authMessage');
+                    
+                    if (password.length < 6) {
+                        messageDiv.classList.remove('hidden', 'success');
+                        messageDiv.classList.add('error');
+                        messageDiv.textContent = 'Le mot de passe doit contenir au moins 6 caractères';
+                        return;
+                    }
+                    
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Inscription...';
+                    
+                    const { data, error } = await supabase.auth.signUp({
+                        email: email,
+                        password: password,
+                        options: {
+                            data: {
+                                app_name: 'Muscle Tracker'
+                            }
+                        }
+                    });
+                    
+                    if (error) {
+                        messageDiv.classList.remove('hidden', 'success');
+                        messageDiv.classList.add('error');
+                        messageDiv.textContent = error.message;
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Créer un compte';
+                    } else {
+                        messageDiv.classList.remove('hidden', 'error');
+                        messageDiv.classList.add('success');
+                        messageDiv.textContent = 'Compte créé ! Vérifiez vos emails pour confirmer votre inscription.';
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Créer un compte';
+                        
+                        // Auto redirection après 3 secondes
+                        setTimeout(() => {
+                            renderAuth();
+                        }, 3000);
+                    }
+                });
+            }
+
+            // ========== FONCTIONS DE CHARGEMENT DES DONNÉES ==========
+            
             async function loadProfile() {
-                if (!state.user || state.user.id.startsWith('local-')) {
-                    state.profile = { sex: 'female', age: 28, weight: 62, goal: 'Progresser' };
-                    return;
-                }
+                if (!state.user) return;
+                
                 try {
                     const { data, error } = await supabase
                         .from('profiles')
                         .select('*')
                         .eq('user_id', state.user.id)
                         .maybeSingle();
+                    
                     if (error) throw error;
+                    
                     if (data) {
                         state.profile = data;
                     } else {
@@ -174,73 +375,64 @@
                             weight: 62,
                             goal: 'Progresser'
                         };
+                        
                         const { error: insertError } = await supabase
                             .from('profiles')
                             .insert([defaultProfile]);
+                        
                         if (insertError) throw insertError;
+                        
                         state.profile = defaultProfile;
-                        console.log('Profil créé avec succès');
                     }
                 } catch (e) {
-                    console.error('Erreur loadProfile:', e);
-                    alert('Impossible de charger/créer votre profil. Utilisation de valeurs par défaut.');
-                    state.profile = { sex: 'female', age: 28, weight: 62, goal: 'Progresser' };
-                }
-            }
-
-            async function saveProfile(updated) {
-                if (!state.user || state.user.id.startsWith('local-')) {
-                    state.profile = { ...state.profile, ...updated };
-                    alert('Profil mis à jour (mode local)');
-                    renderView(state.currentView);
-                    return;
-                }
-                try {
-                    const newProfile = { ...state.profile, ...updated, user_id: state.user.id };
-                    const { error } = await supabase
-                        .from('profiles')
-                        .upsert(newProfile, { onConflict: 'user_id' });
-                    if (error) throw error;
-                    state.profile = newProfile;
-                    alert('Profil mis à jour en ligne ✅');
-                } catch (e) {
-                    console.error('Erreur saveProfile:', e);
-                    alert('Erreur lors de la sauvegarde du profil. Réessayez.');
-                } finally {
-                    renderView(state.currentView);
+                    console.error('Erreur chargement profil:', e);
+                    alert('Erreur lors du chargement du profil');
                 }
             }
 
             async function loadPerformances() {
-                if (!state.user || state.user.id.startsWith('local-')) {
-                    state.performances = [];
-                    return;
-                }
+                if (!state.user) return;
+                
                 try {
                     const { data, error } = await supabase
                         .from('performances')
                         .select('*')
                         .eq('user_id', state.user.id)
                         .order('created_at', { ascending: false });
+                    
                     if (error) throw error;
+                    
                     state.performances = data || [];
-                    console.log('Performances chargées:', state.performances.length);
-                } catch (e) {
-                    console.error('Erreur loadPerformances:', e);
-                    alert('Erreur lors du chargement des performances.');
-                } finally {
                     updateLevelBadge();
+                } catch (e) {
+                    console.error('Erreur chargement performances:', e);
+                }
+            }
+
+            async function saveProfile(updated) {
+                if (!state.user) return;
+                
+                try {
+                    const newProfile = { ...state.profile, ...updated, user_id: state.user.id };
+                    const { error } = await supabase
+                        .from('profiles')
+                        .upsert(newProfile, { onConflict: 'user_id' });
+                    
+                    if (error) throw error;
+                    
+                    state.profile = newProfile;
+                    alert('Profil mis à jour !');
+                } catch (e) {
+                    console.error('Erreur sauvegarde profil:', e);
+                    alert('Erreur lors de la sauvegarde');
+                } finally {
+                    renderView(state.currentView);
                 }
             }
 
             async function addPerformance(perfData) {
-                if (!state.user || state.user.id.startsWith('local-')) {
-                    alert('Mode local : performance simulée (non enregistrée en ligne)');
-                    const fakePerf = { ...perfData, user_id: state.user.id, created_at: new Date().toISOString() };
-                    state.performances = [fakePerf, ...state.performances];
-                    updateLevelBadge();
-                    return fakePerf;
-                }
+                if (!state.user) return;
+                
                 try {
                     const newPerf = {
                         user_id: state.user.id,
@@ -251,28 +443,32 @@
                         distance: perfData.distance || null,
                         created_at: new Date().toISOString()
                     };
+                    
                     const { error } = await supabase
                         .from('performances')
                         .insert([newPerf]);
+                    
                     if (error) throw error;
-                    console.log('Performance ajoutée avec succès');
-                    await loadPerformances(); // recharger la liste
+                    
+                    await loadPerformances();
                     return newPerf;
                 } catch (e) {
-                    console.error('Erreur addPerformance:', e);
-                    alert('Erreur lors de l\'enregistrement. Vérifiez que la table "performances" existe et que les colonnes correspondent.');
-                    throw e; // pour que le formulaire le sache
+                    console.error('Erreur ajout performance:', e);
+                    alert('Erreur lors de l\'enregistrement');
+                    throw e;
                 }
             }
 
             function updateLevelBadge() {
                 const count = state.performances.length;
-                if (count < 4) levelSpan.innerText = 'novice';
-                else if (count < 10) levelSpan.innerText = 'intermédiaire';
-                else levelSpan.innerText = 'confirmé';
+                const badge = document.getElementById('levelBadge');
+                if (count < 4) badge.textContent = 'novice';
+                else if (count < 10) badge.textContent = 'intermédiaire';
+                else badge.textContent = 'confirmé';
             }
 
-            // ========== COMPARAISON ==========
+            // ========== FONCTIONS DE COMPARAISON ==========
+            
             function computePerformanceValue(perf) {
                 const exo = perf.exercise;
                 const cat = EXERCISE_CATEGORY[exo] || 'strength';
@@ -286,24 +482,27 @@
                 const avg = NATIONAL_AVERAGES[exercise]?.[sex];
                 if (!avg) return "Pas de référence nationale pour cet exercice.";
                 const cat = EXERCISE_CATEGORY[exercise];
+                
                 if (cat === 'cardio') {
                     const diff = ((avg - perfValue) / avg * 100).toFixed(1);
-                    if (perfValue < avg) return `🚀 ${perfValue} min (${diff}% plus rapide que la moyenne ${sex==='male'?'H':'F'} ${avg} min)`;
+                    if (perfValue < avg) return `🚀 ${perfValue} min (${diff}% plus rapide)`;
                     if (perfValue > avg) return `⏱️ ${perfValue} min (${Math.abs(diff)}% plus lent)`;
                     return `Égal à la moyenne (${avg} min)`;
                 } else {
                     const diff = ((perfValue - avg) / avg * 100).toFixed(1);
-                    if (perfValue > avg) return `🏆 ${perfValue} (+${diff}% > moyenne ${sex==='male'?'H':'F'} ${avg})`;
-                    if (perfValue < avg) return `📈 ${perfValue} (${Math.abs(diff)}% < moyenne ${avg})`;
+                    if (perfValue > avg) return `🏆 ${perfValue} (+${diff}% > moyenne)`;
+                    if (perfValue < avg) return `📈 ${perfValue} (${Math.abs(diff)}% < moyenne)`;
                     return `✅ Égal à la moyenne (${avg})`;
                 }
             }
 
             // ========== RENDU DES VUES ==========
+            
             function renderDashboard() {
                 const lastPerf = state.performances[0];
                 const sex = state.profile?.sex || 'female';
                 let perfHtml = '';
+                
                 if (lastPerf) {
                     const val = computePerformanceValue(lastPerf);
                     const msg = val ? getComparisonMessage(lastPerf.exercise, val, sex) : 'Performance incomplète';
@@ -319,7 +518,7 @@
                 }
 
                 const nbSeances = state.performances.length;
-                const niveauTexte = levelSpan.innerText;
+                const niveauTexte = document.getElementById('levelBadge').textContent;
                 const prochainPalier = nbSeances < 4 ? 4 - nbSeances : (nbSeances < 10 ? 10 - nbSeances : 'max');
                 const progression = nbSeances === 0 ? 0 : Math.min(100, (nbSeances / 14) * 100);
 
@@ -351,12 +550,18 @@
                             </div>
                         </div>
 
-                        <div class="bg-white p-3 rounded-xl border border-indigo-100 text-xs flex gap-2 items-center">
-                            <i class="fas fa-lightbulb text-amber-500"></i>
-                            <span>Compare tes perfs aux moyennes nationales !</span>
-                        </div>
+                        <button onclick="logout()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 rounded-xl text-sm transition">
+                            <i class="fas fa-sign-out-alt mr-2"></i>Se déconnecter
+                        </button>
                     </div>
                 `;
+
+                window.logout = async function() {
+                    await supabase.auth.signOut();
+                    state.user = null;
+                    state.isAuthenticated = false;
+                    checkSession();
+                };
             }
 
             function renderAdd() {
@@ -367,6 +572,7 @@
                     bodyweight: 'Poids de corps (répétitions)',
                     cardio: 'Cardio / endurance'
                 };
+                
                 for (const [cat, label] of Object.entries(categories)) {
                     optionsHtml += `<optgroup label="${label}">`;
                     for (const [exo, exoLabel] of Object.entries(EXERCISE_LABELS)) {
@@ -400,6 +606,7 @@
                 function updateFields() {
                     const exo = exoSelect.value;
                     const cat = EXERCISE_CATEGORY[exo];
+                    
                     if (cat === 'cardio') {
                         let distanceValue = 5;
                         if (exo === 'run_10k') distanceValue = 10;
@@ -407,6 +614,7 @@
                         else if (exo === 'bike_20k') distanceValue = 20;
                         else if (exo === 'swim_1k') distanceValue = 1;
                         else if (exo === 'row_2k') distanceValue = 2;
+                        
                         dynDiv.innerHTML = `
                             <div><label class="block text-sm font-medium text-gray-700 mb-1">Temps (minutes)</label><input type="number" step="0.1" id="timeMin" class="w-full p-3 border rounded-xl" placeholder="ex: 25.5" required></div>
                             <div><label class="block text-sm font-medium text-gray-700 mb-1">Distance (km)</label><input type="number" step="0.1" id="distance" class="w-full p-3 border rounded-xl bg-gray-100" value="${distanceValue}" readonly></div>
@@ -423,6 +631,7 @@
                         `;
                     }
                 }
+                
                 exoSelect.addEventListener('change', updateFields);
                 updateFields();
 
@@ -457,15 +666,12 @@
                     const sexe = state.profile?.sex || 'female';
                     const msg = getComparisonMessage(exo, compareValue, sexe);
 
-                    // Afficher le feedback immédiat
                     feedback.className = `mt-5 p-3 rounded-xl text-sm ${(cat==='cardio' ? compareValue <= (NATIONAL_AVERAGES[exo]?.[sexe]||Infinity) : compareValue >= (NATIONAL_AVERAGES[exo]?.[sexe]||0)) ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`;
                     feedback.innerHTML = `<i class="fas fa-chart-simple mr-1"></i>${msg}`;
                     feedback.classList.remove('hidden');
 
-                    // Enregistrement effectif
                     try {
                         await addPerformance(perfData);
-                        // Petit message supplémentaire de confirmation
                         const savedMsg = document.createElement('div');
                         savedMsg.className = 'mt-2 text-xs text-green-600';
                         savedMsg.innerHTML = '✅ Enregistré sur Supabase !';
@@ -474,7 +680,7 @@
                     } catch (err) {
                         const errorMsg = document.createElement('div');
                         errorMsg.className = 'mt-2 text-xs text-red-600';
-                        errorMsg.innerHTML = '❌ Erreur d\'enregistrement (voir console)';
+                        errorMsg.innerHTML = '❌ Erreur d\'enregistrement';
                         feedback.appendChild(errorMsg);
                     }
                 });
@@ -501,6 +707,7 @@
 
                 if (state.chartInstance) state.chartInstance.destroy();
                 const ctx = document.getElementById('progressChart')?.getContext('2d');
+                
                 if (ctx && squatPerfs.length > 0) {
                     state.chartInstance = new Chart(ctx, {
                         type: 'line',
@@ -524,6 +731,7 @@
 
             function renderProfile() {
                 const p = state.profile || { sex: 'female', age: 28, weight: 62, goal: 'Progresser' };
+                
                 contentDiv.innerHTML = `
                     <h2 class="font-poppins text-lg mb-4"><i class="fas fa-id-card text-indigo-500 mr-2"></i>Mon profil</h2>
                     <form id="profileForm" class="space-y-4">
@@ -539,8 +747,12 @@
                         <div><label class="block text-sm font-medium text-gray-700 mb-1">Objectif</label><input type="text" id="goal" value="${p.goal}" class="w-full p-3 border rounded-xl"></div>
                         <button type="submit" class="w-full bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-medium py-3 rounded-xl transition">Mettre à jour</button>
                     </form>
-                    <p class="text-xs text-gray-400 mt-6 text-center">Données sécurisées via Supabase</p>
+                    
+                    <button onclick="logout()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 rounded-xl text-sm transition mt-4">
+                        <i class="fas fa-sign-out-alt mr-2"></i>Se déconnecter
+                    </button>
                 `;
+
                 document.getElementById('profileForm').addEventListener('submit', async (e) => {
                     e.preventDefault();
                     await saveProfile({
@@ -550,14 +762,24 @@
                         goal: document.getElementById('goal').value
                     });
                 });
+
+                window.logout = async function() {
+                    await supabase.auth.signOut();
+                    state.user = null;
+                    state.isAuthenticated = false;
+                    checkSession();
+                };
             }
 
             function renderView(view) {
+                if (!state.isAuthenticated) return;
+                
                 state.currentView = view;
                 navItems.forEach(item => {
                     item.classList.toggle('active', item.dataset.view === view);
                     item.classList.toggle('text-indigo-600', item.dataset.view === view);
                 });
+                
                 if (view === 'dashboard') renderDashboard();
                 else if (view === 'add') renderAdd();
                 else if (view === 'progress') renderProgress();
@@ -567,13 +789,9 @@
             // Navigation
             navItems.forEach(item => item.addEventListener('click', () => renderView(item.dataset.view)));
 
-            // Démarrer l'application
-            await initAuth();
+            // Initialisation
+            await checkSession();
         })();
     </script>
-    <!-- Vérifiez que les tables "profiles" et "performances" existent avec les bonnes colonnes :
-         - profiles : user_id (uuid), sex (text), age (int), weight (numeric), goal (text)
-         - performances : user_id (uuid), exercise (text), weight (numeric), reps (int), time_min (numeric), distance (numeric), created_at (timestamptz)
-    -->
 </body>
 </html>
