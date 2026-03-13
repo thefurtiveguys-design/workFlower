@@ -3,116 +3,518 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>France Donations · Financement participatif</title>
-    <!-- Font Awesome -->
+    <title>Muscle Tracker · progression sportive</title>
+    <!-- Inter & Poppins (élégant & lisible) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&family=Poppins:wght@500;600&display=swap" rel="stylesheet">
+    <!-- Tailwind (utilitaires minimalistes) + tiny custom -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome 6 (gratuit) pour icônes dynamiques -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <!-- Google Fonts Inter -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- CSS principal -->
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <!-- HEADER -->
-    <header class="header">
-        <div class="header-content">
-            <div class="logo">France Donations</div>
-            
-            <nav class="nav-links">
-                <a href="#" data-page="home" class="active">Découvrir</a>
-                <a href="#" data-page="create">Lancer un projet</a>
-            </nav>
-            
-            <div class="nav-icons">
-                <div class="search-container">
-                    <i class="fas fa-search" id="search-icon"></i>
-                    <input type="text" class="search-input" id="search-input" placeholder="Rechercher...">
-                </div>
-                <i class="fas fa-bell" id="notification-icon"></i>
-                <div class="user-menu" id="user-menu">
-                    <i class="fas fa-user-circle" id="user-icon"></i>
-                    <div class="user-dropdown hidden" id="user-dropdown">
-                        <a href="#" id="profile-link">Profil</a>
-                        <a href="#" id="my-projects-link">Mes projets</a>
-                        <a href="#" id="logout-link">Déconnexion</a>
-                    </div>
-                </div>
-                <i class="fas fa-sign-in-alt" id="login-icon"></i>
-            </div>
-        </div>
-    </header>
-
-    <!-- MAIN CONTENT (injecté dynamiquement) -->
-    <main id="main-content"></main>
-
-    <!-- BOTTOM NAV MOBILE -->
-    <nav class="bottom-nav" id="bottom-nav">
-        <i class="fas fa-home active" data-page="home"></i>
-        <i class="fas fa-compass" data-page="explore"></i>
-        <i class="fas fa-plus-circle" data-page="create"></i>
-        <i class="fas fa-bell" data-page="notifications"></i>
-        <i class="fas fa-user" data-page="profile"></i>
-    </nav>
-
-    <!-- MODAL AUTH -->
-    <div class="modal hidden" id="auth-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="auth-modal-title">Connexion</h2>
-                <i class="fas fa-times close-modal" id="close-auth-modal"></i>
-            </div>
-            <div class="modal-body">
-                <form id="auth-form">
-                    <div class="form-group">
-                        <label for="auth-email">Email</label>
-                        <input type="email" id="auth-email" placeholder="votre@email.com" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="auth-password">Mot de passe</label>
-                        <input type="password" id="auth-password" placeholder="••••••••" required>
-                    </div>
-                    <button type="submit" class="modal-btn" id="auth-submit">Se connecter</button>
-                </form>
-                <div class="modal-footer">
-                    <span id="auth-toggle">Créer un compte</span>
-                </div>
-                <div id="auth-message"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL CRÉATION PROJET -->
-    <div class="modal hidden" id="create-project-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Lancer un projet</h2>
-                <i class="fas fa-times close-modal" id="close-create-modal"></i>
-            </div>
-            <div class="modal-body">
-                <form id="create-project-form">
-                    <div class="form-group">
-                        <label>Titre</label>
-                        <input type="text" id="project-title" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Description</label>
-                        <textarea id="project-description" rows="3" required></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>Montant cible (€)</label>
-                        <input type="number" id="project-target" min="1" step="0.01" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Email PayPal</label>
-                        <input type="email" id="project-paypal" required>
-                    </div>
-                    <button type="submit" class="modal-btn">Publier</button>
-                </form>
-                <div id="create-message"></div>
-            </div>
-        </div>
-    </div>
-
+    <!-- Chart.js pour graphiques simples -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Supabase JS client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #f4f6fa; }
+        .font-poppins { font-family: 'Poppins', sans-serif; }
+        .card-hover { transition: all 0.15s ease; }
+        .card-hover:active { transform: scale(0.98); background-color: #f9fafc; }
+        .bottom-nav-item.active i, .bottom-nav-item.active span { color: #4f46e5; font-weight: 600; }
+        .progress-radial { background: conic-gradient(#4f46e5 0deg 180deg, #e9eaf0 180deg 360deg); }
+        .badge-niveau { background: linear-gradient(145deg, #e0e7ff, #c7d2fe); color: #1e1b4b; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-3">
+
+    <!-- Carte principale (mobile first, max-w-md) -->
+    <div class="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100 relative" style="min-height: 680px;">
+        
+        <!-- Entête fixe avec titre et petite déco -->
+        <div class="px-5 pt-6 pb-2 border-b border-gray-100 flex items-center justify-between">
+            <h1 class="text-xl font-poppins font-semibold text-gray-800"><i class="fas fa-dumbbell text-indigo-500 mr-2"></i>Muscle Tracker</h1>
+            <div class="bg-indigo-50 px-3 py-1 rounded-full text-xs font-medium text-indigo-700 shadow-sm flex items-center gap-1">
+                <i class="fas fa-bolt text-xs"></i> <span id="levelBadge">novice</span>
+            </div>
+        </div>
+
+        <!-- Contenu principal (change dynamiquement) -->
+        <div id="appContent" class="p-5 pb-24 transition-opacity duration-200">
+            <!-- injecté par JS -->
+        </div>
+
+        <!-- Barre de navigation bottom (mobile) style Uber / Duolingo -->
+        <div class="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-200 flex justify-around py-2 px-4 text-xs text-gray-500">
+            <div class="bottom-nav-item flex flex-col items-center cursor-pointer active" data-view="dashboard">
+                <i class="fas fa-home text-xl mb-0.5"></i>
+                <span>Accueil</span>
+            </div>
+            <div class="bottom-nav-item flex flex-col items-center cursor-pointer" data-view="add">
+                <i class="fas fa-plus-circle text-xl mb-0.5"></i>
+                <span>Ajouter</span>
+            </div>
+            <div class="bottom-nav-item flex flex-col items-center cursor-pointer" data-view="progress">
+                <i class="fas fa-chart-line text-xl mb-0.5"></i>
+                <span>Progrès</span>
+            </div>
+            <div class="bottom-nav-item flex flex-col items-center cursor-pointer" data-view="profile">
+                <i class="fas fa-user-circle text-xl mb-0.5"></i>
+                <span>Profil</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (async function() {
+            // ---------- CONFIG SUPABASE (fournie par l'utilisateur) ----------
+            const SUPABASE_URL = 'https://ylrseemuvxogyopwqrnr.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlscnNlZW11dnhvZ3lvcHdycW5yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1NDA1MzIsImV4cCI6MjA4ODExNjUzMn0.Bc1yhbVNbLGU_bMQBjecXe0Is-WtZMWXALcW-oWYkPA';
+
+            // initialisation Supabase
+            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                auth: { persistSession: true, autoRefreshToken: true }
+            });
+
+            // ---------- MOYENNES NATIONALES (indicatives) ----------
+            const NATIONAL_AVERAGES = {
+                squat: { male: 95, female: 55 },        // 1RM estimé (kg)
+                bench: { male: 75, female: 38 },
+                deadlift: { male: 120, female: 68 },
+                "run5k": { male: 22, female: 26 },       // temps en minutes (plus bas = meilleur)
+                // on peut ajouter d'autres exos
+            };
+
+            // ---------- ETAT GLOBAL ----------
+            let state = {
+                user: null,
+                profile: null,      // { sex, age, weight, goal }
+                performances: [],
+                currentView: 'dashboard',
+                chartInstance: null
+            };
+
+            // éléments DOM
+            const contentDiv = document.getElementById('appContent');
+            const navItems = document.querySelectorAll('.bottom-nav-item');
+            const levelSpan = document.getElementById('levelBadge');
+
+            // ---------- FONCTIONS D'AUTH ET PROFIL ----------
+            async function initAuth() {
+                // essayer de récupérer session anonyme existante
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user) {
+                    state.user = session.user;
+                } else {
+                    // connexion anonyme
+                    const { data, error } = await supabase.auth.signInAnonymously();
+                    if (error) {
+                        console.warn('Auth anonyme échouée, utilisation fallback localStorage', error);
+                        // fallback: user fictif stocké en local (pas de supabase)
+                        state.user = { id: 'local-' + Math.random().toString(36) };
+                    } else {
+                        state.user = data.user;
+                    }
+                }
+                // charger profil (soit depuis Supabase, soit local fallback)
+                await loadProfile();
+                // charger performances
+                await loadPerformances();
+                // mettre à jour l'affichage
+                renderView(state.currentView);
+            }
+
+            async function loadProfile() {
+                if (!state.user) return;
+                // essayer Supabase d'abord
+                try {
+                    const { data, error } = await supabase
+                        .from('profiles')
+                        .select('*')
+                        .eq('user_id', state.user.id)
+                        .single();
+                    if (error && error.code !== 'PGRST116') { // PGRST116 = pas de ligne
+                        console.warn('Erreur chargement profil', error);
+                    }
+                    if (data) {
+                        state.profile = data;
+                    } else {
+                        // créer un profil par défaut (sexe femme par défaut pour l'exemple)
+                        const defaultProfile = {
+                            user_id: state.user.id,
+                            sex: 'female',      // ajustable dans profil
+                            age: 28,
+                            weight: 62,
+                            goal: 'prendre du muscle'
+                        };
+                        const { error: insertError } = await supabase
+                            .from('profiles')
+                            .insert([defaultProfile]);
+                        if (insertError) {
+                            console.warn('Création profil échouée, stockage local');
+                            // fallback local
+                            state.profile = defaultProfile;
+                        } else {
+                            state.profile = defaultProfile;
+                        }
+                    }
+                } catch (e) {
+                    console.log('fallback profil local', e);
+                    state.profile = { sex: 'female', age: 28, weight: 62, goal: 'progresser' };
+                }
+                // garantir un sexe par défaut
+                if (!state.profile?.sex) state.profile.sex = 'female';
+            }
+
+            async function saveProfile(updatedProfile) {
+                if (!state.user) return;
+                const newProfile = { ...state.profile, ...updatedProfile, user_id: state.user.id };
+                try {
+                    const { error } = await supabase
+                        .from('profiles')
+                        .upsert(newProfile, { onConflict: 'user_id' });
+                    if (error) throw error;
+                    state.profile = newProfile;
+                } catch (e) {
+                    console.warn('échec sauvegarde profil, fallback local', e);
+                    state.profile = newProfile;
+                }
+                renderView(state.currentView); // rafraîchir
+            }
+
+            async function loadPerformances() {
+                if (!state.user) return;
+                try {
+                    const { data, error } = await supabase
+                        .from('performances')
+                        .select('*')
+                        .eq('user_id', state.user.id)
+                        .order('created_at', { ascending: false });
+                    if (error) throw error;
+                    state.performances = data || [];
+                } catch (e) {
+                    console.warn('chargement perf échoué, utilise local', e);
+                    // fallback : performances mock
+                    state.performances = [];
+                }
+                updateLevelBadge();
+            }
+
+            async function addPerformance(perfData) {
+                if (!state.user) return;
+                const newPerf = {
+                    user_id: state.user.id,
+                    ...perfData,
+                    created_at: new Date().toISOString()
+                };
+                try {
+                    const { error } = await supabase
+                        .from('performances')
+                        .insert([newPerf]);
+                    if (error) throw error;
+                    // recharger liste
+                    await loadPerformances();
+                } catch (e) {
+                    console.warn('insert perf échouée, ajout en cache local', e);
+                    state.performances = [newPerf, ...state.performances];
+                }
+                // retourner la perf pour affichage feedback
+                return newPerf;
+            }
+
+            // petit calcul de niveau basé sur le nb de perf et charges
+            function updateLevelBadge() {
+                if (!state.performances.length) {
+                    levelSpan.innerText = 'débutant';
+                    return;
+                }
+                const count = state.performances.length;
+                if (count < 3) levelSpan.innerText = 'novice';
+                else if (count < 8) levelSpan.innerText = 'intermédiaire';
+                else levelSpan.innerText = 'confirmé';
+            }
+
+            // fonction comparaison selon sexe et exo
+            function getComparisonMessage(exercise, value, sex) {
+                const avg = NATIONAL_AVERAGES[exercise]?.[sex] || null;
+                if (!avg) return "Pas de référence pour cet exercice.";
+                if (exercise === 'run5k') {
+                    // plus petit = meilleur
+                    if (value < avg) return `👏 ${value} min, mieux que la moyenne ${sex==='male'?'H':'F'} (${avg} min) !`;
+                    if (value > avg) return `⏱️ ${value} min, moyenne ${sex==='male'?'H':'F'} : ${avg} min. Continue !`;
+                    return `Égal à la moyenne (${avg} min)`;
+                } else {
+                    // force : plus grand = meilleur
+                    if (value > avg) return `🏆 ${value} kg > moyenne ${sex==='male'?'H':'F'} (${avg} kg)`;
+                    if (value < avg) return `📈 ${value} kg, moyenne ${sex==='male'?'H':'F'} : ${avg} kg. Progresse !`;
+                    return `✅ Égal à la moyenne (${avg} kg)`;
+                }
+            }
+
+            // ---------- RENDU DES VUES ----------
+            function renderDashboard() {
+                const lastPerf = state.performances[0];
+                const sex = state.profile?.sex || 'female';
+                let perfHtml = '';
+                if (lastPerf) {
+                    let val, exo = lastPerf.exercise;
+                    if (exo === 'run5k') val = lastPerf.time_min;
+                    else val = lastPerf.weight; // on compare le poids simple (on pourrait utiliser 1RM estimé mais simplifions)
+                    const msg = getComparisonMessage(exo, val, sex);
+                    perfHtml = `
+                        <div class="bg-indigo-50 p-4 rounded-xl mt-2">
+                            <p class="text-sm text-gray-600">Dernière séance : <span class="font-semibold">${exo}</span></p>
+                            <p class="text-lg font-medium">${lastPerf.weight ? lastPerf.weight+' kg' : ''} ${lastPerf.reps ? lastPerf.reps+' reps' : ''} ${lastPerf.time_min ? lastPerf.time_min+' min' : ''}</p>
+                            <p class="text-sm mt-1 ${val > NATIONAL_AVERAGES[exo]?.[sex] ? 'text-green-600' : 'text-amber-600'}">${msg}</p>
+                        </div>
+                    `;
+                } else {
+                    perfHtml = `<p class="text-gray-400 text-center py-4">Aucune performance enregistrée. Ajoutez-en !</p>`;
+                }
+
+                // stats rapides : nombre d'exercices, badge
+                const nbSeances = state.performances.length;
+                const niveauTexte = levelSpan.innerText;
+                const prochainPalier = nbSeances < 3 ? 3 - nbSeances : (nbSeances < 8 ? 8 - nbSeances : 'max');
+                const progression = nbSeances === 0 ? 0 : Math.min(100, (nbSeances / 10) * 100);
+
+                contentDiv.innerHTML = `
+                    <div class="space-y-5">
+                        <!-- carte niveau global radial simplifié -->
+                        <div class="flex items-center gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                            <div class="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center relative">
+                                <span class="text-xl font-bold text-indigo-700">${progression}%</span>
+                            </div>
+                            <div>
+                                <p class="text-gray-500 text-xs">NIVEAU GLOBAL</p>
+                                <p class="font-poppins font-semibold text-xl">${niveauTexte}</p>
+                                <p class="text-xs text-gray-400">${prochainPalier === 'max' ? 'Excellent rythme' : `encore ${prochainPalier} séances pour monter`}</p>
+                            </div>
+                        </div>
+
+                        <!-- carte dernière performance -->
+                        <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+                            <h2 class="font-medium text-gray-700 mb-2 flex items-center gap-1"><i class="fas fa-clock text-indigo-400"></i> Dernière activité</h2>
+                            ${perfHtml}
+                        </div>
+
+                        <!-- petit rappel objectif / profil -->
+                        <div class="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-2xl">
+                            <p class="text-xs text-indigo-700 uppercase tracking-wider">objectif</p>
+                            <p class="font-medium">${state.profile?.goal || 'progresser'}</p>
+                            <div class="flex gap-3 mt-2 text-xs text-gray-600">
+                                <span><i class="fas fa-venus-mars mr-1"></i>${state.profile?.sex === 'male' ? 'Homme' : 'Femme'}</span>
+                                <span><i class="fas fa-calendar-alt mr-1"></i>${state.profile?.age || '--'} ans</span>
+                                <span><i class="fas fa-weight-scale mr-1"></i>${state.profile?.weight || '--'} kg</span>
+                            </div>
+                        </div>
+
+                        <!-- astuce motivation -->
+                        <div class="bg-white p-3 rounded-xl border border-indigo-100 text-xs flex gap-2 items-center">
+                            <i class="fas fa-lightbulb text-amber-500"></i>
+                            <span>Compare tes perfs aux moyennes nationales !</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function renderAdd() {
+                const sex = state.profile?.sex || 'female';
+                contentDiv.innerHTML = `
+                    <h2 class="font-poppins text-lg mb-4">➕ Nouvelle performance</h2>
+                    <form id="perfForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Exercice</label>
+                            <select id="exoSelect" class="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-200 outline-none">
+                                <option value="squat">Squat</option>
+                                <option value="bench">Développé couché</option>
+                                <option value="deadlift">Soulevé de terre</option>
+                                <option value="run5k">Course 5 km</option>
+                            </select>
+                        </div>
+
+                        <!-- champs dynamiques selon exo (gérés par JS) -->
+                        <div id="dynamicFields"></div>
+
+                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 rounded-xl shadow-md transition">Enregistrer la performance</button>
+                    </form>
+
+                    <div id="feedbackMessage" class="mt-5 p-3 rounded-xl text-sm hidden"></div>
+                `;
+
+                const exoSelect = document.getElementById('exoSelect');
+                const dynDiv = document.getElementById('dynamicFields');
+                const form = document.getElementById('perfForm');
+                const feedback = document.getElementById('feedbackMessage');
+
+                function updateFields() {
+                    const exo = exoSelect.value;
+                    if (exo === 'run5k') {
+                        dynDiv.innerHTML = `
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Temps (minutes)</label><input type="number" step="0.1" id="timeMin" class="w-full p-3 border rounded-xl" placeholder="ex: 26.5" required></div>
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Distance (km)</label><input type="number" step="0.1" id="distance" class="w-full p-3 border rounded-xl" value="5" readonly class="bg-gray-100"></div>
+                        `;
+                    } else {
+                        dynDiv.innerHTML = `
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Poids (kg)</label><input type="number" step="0.5" id="weight" class="w-full p-3 border rounded-xl" placeholder="ex: 50" required></div>
+                            <div><label class="block text-sm font-medium text-gray-700 mb-1">Répétitions</label><input type="number" id="reps" class="w-full p-3 border rounded-xl" placeholder="ex: 8" value="5" required></div>
+                        `;
+                    }
+                }
+                exoSelect.addEventListener('change', updateFields);
+                updateFields();
+
+                form.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const exo = exoSelect.value;
+                    let perfData = { exercise: exo };
+                    if (exo === 'run5k') {
+                        const time = parseFloat(document.getElementById('timeMin')?.value);
+                        const dist = 5.0;
+                        if (!time || time <= 0) { alert('temps invalide'); return; }
+                        perfData.time_min = time;
+                        perfData.distance = dist;
+                        // pour comparaison, on utilise le temps
+                        const compareValue = time;
+                        const sexe = state.profile?.sex || 'female';
+                        const msg = getComparisonMessage(exo, compareValue, sexe);
+                        feedback.className = `mt-5 p-3 rounded-xl text-sm ${compareValue <= NATIONAL_AVERAGES[exo]?.[sexe] ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`;
+                        feedback.innerHTML = `<i class="fas fa-info-circle mr-1"></i>${msg}`;
+                    } else {
+                        const weight = parseFloat(document.getElementById('weight')?.value);
+                        const reps = parseInt(document.getElementById('reps')?.value);
+                        if (!weight || weight <=0 || !reps || reps<=0) { alert('poids/répétitions invalides'); return; }
+                        perfData.weight = weight;
+                        perfData.reps = reps;
+                        // estimation 1RM simplifiée pour comparaison (Epley: weight*(1+reps/30))
+                        const estimated1RM = weight * (1 + reps/30);
+                        const sexe = state.profile?.sex || 'female';
+                        const msg = getComparisonMessage(exo, estimated1RM, sexe);
+                        feedback.className = `mt-5 p-3 rounded-xl text-sm ${estimated1RM >= NATIONAL_AVERAGES[exo]?.[sexe] ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`;
+                        feedback.innerHTML = `<i class="fas fa-dumbbell mr-1"></i>${msg} (1RM estimé ${estimated1RM.toFixed(1)} kg)`;
+                    }
+                    feedback.classList.remove('hidden');
+
+                    // sauver dans supabase
+                    await addPerformance(perfData);
+                    // re-rendre dashboard apres ajout? mais on reste sur add pour voir feedback
+                    // on met à jour le badge
+                    updateLevelBadge();
+                });
+            }
+
+            function renderProgress() {
+                // graphique simple avec Chart.js pour squat (exemple)
+                const squatPerfs = state.performances.filter(p => p.exercise === 'squat').reverse(); // du plus ancien au récent
+                const labels = squatPerfs.map((_, i) => `S${i+1}`);
+                const data = squatPerfs.map(p => p.weight ? p.weight * (1 + (p.reps||5)/30) : 0); // estimé 1RM
+
+                contentDiv.innerHTML = `
+                    <h2 class="font-poppins text-lg mb-3">📈 Évolution squat (1RM estimé)</h2>
+                    <div class="bg-white p-3 rounded-2xl border border-gray-200">
+                        <canvas id="progressChart" width="300" height="180"></canvas>
+                    </div>
+                    <div class="mt-5 space-y-2">
+                        <p class="text-sm font-medium text-gray-600">📋 Dernières performances</p>
+                        ${state.performances.slice(0,5).map(p => {
+                            return `<div class="flex justify-between bg-gray-50 p-2 rounded-lg text-sm"><span>${p.exercise}</span> <span>${p.weight ? p.weight+'kg' : ''} ${p.reps ? p.reps+' reps' : ''} ${p.time_min ? p.time_min+' min' : ''}</span></div>`;
+                        }).join('')}
+                    </div>
+                `;
+
+                if (state.chartInstance) state.chartInstance.destroy();
+                const ctx = document.getElementById('progressChart')?.getContext('2d');
+                if (ctx && squatPerfs.length > 0) {
+                    state.chartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: '1RM squat (kg)',
+                                data: data,
+                                borderColor: '#4f46e5',
+                                tension: 0.2
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: true }
+                    });
+                } else if (ctx) {
+                    ctx.font = '12px Inter';
+                    ctx.fillStyle = '#aaa';
+                    ctx.fillText('Pas assez de données squat', 20, 90);
+                }
+            }
+
+            function renderProfile() {
+                const p = state.profile || { sex: 'female', age: 28, weight: 62, goal: 'progresser' };
+                contentDiv.innerHTML = `
+                    <h2 class="font-poppins text-lg mb-4"><i class="fas fa-id-card text-indigo-500 mr-2"></i>Mon profil</h2>
+                    <form id="profileForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Sexe</label>
+                            <select id="sex" class="w-full p-3 border border-gray-200 rounded-xl">
+                                <option value="female" ${p.sex==='female'?'selected':''}>Femme</option>
+                                <option value="male" ${p.sex==='male'?'selected':''}>Homme</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Âge</label>
+                            <input type="number" id="age" value="${p.age}" class="w-full p-3 border rounded-xl">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Poids (kg)</label>
+                            <input type="number" step="0.1" id="weight" value="${p.weight}" class="w-full p-3 border rounded-xl">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Objectif</label>
+                            <input type="text" id="goal" value="${p.goal}" class="w-full p-3 border rounded-xl" placeholder="ex: prendre du muscle">
+                        </div>
+                        <button type="submit" class="w-full bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-medium py-3 rounded-xl transition">Mettre à jour</button>
+                    </form>
+                    <p class="text-xs text-gray-400 mt-6 text-center">Les données sont synchronisées via Supabase 🔐</p>
+                `;
+                document.getElementById('profileForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const updated = {
+                        sex: document.getElementById('sex').value,
+                        age: parseInt(document.getElementById('age').value),
+                        weight: parseFloat(document.getElementById('weight').value),
+                        goal: document.getElementById('goal').value
+                    };
+                    await saveProfile(updated);
+                    renderView('profile'); // rafraîchir
+                });
+            }
+
+            function renderView(view) {
+                state.currentView = view;
+                navItems.forEach(item => {
+                    const v = item.dataset.view;
+                    if (v === view) item.classList.add('active', 'text-indigo-600');
+                    else item.classList.remove('active', 'text-indigo-600');
+                });
+                // appel fonction correspondante
+                if (view === 'dashboard') renderDashboard();
+                else if (view === 'add') renderAdd();
+                else if (view === 'progress') renderProgress();
+                else if (view === 'profile') renderProfile();
+            }
+
+            // navigation
+            navItems.forEach(item => {
+                item.addEventListener('click', () => {
+                    renderView(item.dataset.view);
+                });
+            });
+
+            // lancement
+            await initAuth();
+        })();
+    </script>
+
+    <!-- Note : pour que tout fonctionne, créez ces tables dans votre projet Supabase :
+    -- 1. Table "profiles" : user_id (uuid, references auth.users), sex(text), age(int), weight(numeric), goal(text)
+    -- 2. Table "performances" : id(bigint primary key), user_id(uuid), exercise(text), weight(numeric), reps(int), distance(numeric), time_min(numeric), created_at(timestamptz default now())
+    -->
 </body>
 </html>
