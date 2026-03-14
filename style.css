@@ -1,0 +1,468 @@
+:root {
+    /* Uber Eats Colors */
+    --primary: #06C167;
+    --primary-hover: #05a055;
+    --bg-color: #FFFFFF;
+    --card-bg: #F6F6F6;
+    --text-main: #1C1C1E;
+    --text-muted: #545454;
+    --border-color: #E2E2E2;
+    
+    /* Badges */
+    --badge-green: #E8F9F0;
+    --badge-green-text: #06C167;
+    --badge-orange: #FFF0E6;
+    --badge-orange-text: #FF9800;
+    --badge-yellow: #FFF9E6;
+    --badge-yellow-text: #FBC02D;
+    
+    /* Typography */
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    
+    /* Layout */
+    --max-width: 600px;
+    --border-radius-lg: 16px;
+    --border-radius-md: 12px;
+    --border-radius-sm: 8px;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--font-family);
+    background-color: #f0f0f0; /* Darker bg outside the app container */
+    color: var(--text-main);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+.app-container {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    background-color: var(--bg-color);
+    min-height: 100vh;
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Typography */
+h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0;
+}
+
+/* Header */
+.header {
+    padding: 1.5rem 1.5rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    background-color: var(--bg-color);
+    z-index: 10;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--primary);
+}
+
+.subtitle {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+/* Main Content */
+.main-content {
+    padding: 1.5rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Cards */
+.card {
+    background-color: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    padding: 1.25rem;
+    box-shadow: var(--shadow-sm);
+}
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0.75rem 1rem;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background-color: var(--primary);
+    color: white;
+}
+
+.btn-primary:not(:disabled):hover {
+    background-color: var(--primary-hover);
+}
+
+.btn-secondary {
+    background-color: var(--card-bg);
+    color: var(--text-main);
+}
+
+.btn-secondary:hover {
+    background-color: #e8e8e8;
+}
+
+.btn-large {
+    padding: 1rem 1.5rem;
+    font-size: 1.125rem;
+    border-radius: var(--border-radius-md);
+}
+
+.btn-block {
+    width: 100%;
+}
+
+.btn-icon {
+    padding: 0.75rem;
+}
+
+/* Camera Section */
+.camera-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: center;
+    text-align: center;
+    background-color: var(--card-bg);
+    border: none;
+}
+
+#camera-container {
+    width: 100%;
+    position: relative;
+    border-radius: var(--border-radius-md);
+    overflow: hidden;
+    background-color: #000;
+    aspect-ratio: 3/4;
+}
+
+#videoElement {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.camera-controls {
+    position: absolute;
+    bottom: 1rem;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 1.5rem;
+}
+
+.btn-capture {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background-color: rgba(255,255,255,0.3);
+    border: 4px solid white;
+    padding: 0;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.capture-inner {
+    width: 48px;
+    height: 48px;
+    background-color: white;
+    border-radius: 50%;
+    transition: transform 0.1s ease;
+}
+
+.btn-capture:active .capture-inner {
+    transform: scale(0.9);
+}
+
+#close-camera-btn {
+    background-color: rgba(0,0,0,0.5);
+    color: white;
+    position: absolute;
+    right: 1.5rem;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+}
+
+.upload-fallback {
+    margin-top: 0.5rem;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Ingredients Section */
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.badge-neutral {
+    background-color: var(--border-color);
+    color: var(--text-main);
+}
+
+.badge-green {
+    background-color: var(--badge-green);
+    color: var(--badge-green-text);
+}
+
+.badge-orange {
+    background-color: var(--badge-orange);
+    color: var(--badge-orange-text);
+}
+
+.add-ingredient {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.add-ingredient input {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    font-family: inherit;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.add-ingredient input:focus {
+    border-color: var(--primary);
+}
+
+.ingredients-list {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.ingredient-tag {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 2rem;
+    padding: 0.5rem 1rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.ingredient-tag button {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.ingredient-tag button:hover {
+    color: #ff3b30;
+}
+
+.empty-state {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 0.875rem;
+    width: 100%;
+    text-align: center;
+    padding: 1rem 0;
+}
+
+/* Actions */
+.action-container {
+    position: sticky;
+    bottom: 1.5rem;
+    z-index: 10;
+}
+
+/* Loader */
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--border-color);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+#loading-indicator {
+    text-align: center;
+    padding: 2rem 0;
+    color: var(--text-muted);
+}
+
+/* Menu Section */
+.menu-section {
+    margin-top: 1rem;
+    padding-bottom: 5rem;
+}
+
+.days-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.day-card {
+    background-color: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+.day-header {
+    background-color: var(--card-bg);
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.recipe-content {
+    padding: 1rem;
+    display: flex;
+    gap: 1rem;
+}
+
+.recipe-image {
+    width: 80px;
+    height: 80px;
+    border-radius: var(--border-radius-sm);
+    object-fit: cover;
+    background-color: var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 2rem;
+}
+
+.recipe-info {
+    flex: 1;
+}
+
+.recipe-title {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.recipe-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+}
+
+.recipe-meta span {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.recipe-ingredients {
+    font-size: 0.8125rem;
+    color: var(--text-main);
+}
+
+.ingredient-missing {
+    color: #ff3b30;
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+.regenerate-btn {
+    background: none;
+    border: none;
+    color: var(--primary);
+    cursor: pointer;
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    border-radius: 50%;
+    transition: background-color 0.2s ease;
+}
+
+.regenerate-btn:hover {
+    background-color: var(--badge-green);
+}
