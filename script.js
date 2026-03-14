@@ -160,7 +160,7 @@ function generateMenu() {
     if (userIngredients.length === 0) return;
     
     // Évaluer toutes les recettes
-    const evaluatedRecipes = window.recipes.map(recipe => {
+    const evaluatedRecipes = recipes.map(recipe => {
         const matchData = calculateMatchScore(recipe.ingredients, userIngredients);
         return {
             ...recipe,
@@ -263,7 +263,7 @@ window.regenerateDay = function(index) {
     const currentIds = currentMenu.map(r => r.id);
     
     // Évaluer toutes les recettes
-    const evaluatedRecipes = window.recipes.map(recipe => {
+    const evaluatedRecipes = recipes.map(recipe => {
         const matchData = calculateMatchScore(recipe.ingredients, userIngredients);
         return {
             ...recipe,
