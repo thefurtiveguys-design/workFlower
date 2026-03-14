@@ -45,13 +45,91 @@ async function loadModels() {
 // Initialisation au chargement
 window.addEventListener('DOMContentLoaded', loadModels);
 
-// Analyser une image
+// Intervalles pour le temps réel
+let detectionIntervalId = null;
+
+// Analyser en temps réel via le flux vidéo
+window.startRealTimeDetection = function(videoElement) {
+    if (detectionIntervalId) clearInterval(detectionIntervalId);
+    
+    // On met à jour l'UI pour montrer que le scan est en cours
+    loadingIndicator.innerHTML = '<div class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></div><p style="font-size: 0.8rem;">Dètection temps réel active...</p>';
+    loadingIndicator.classList.remove('hidden');
+    
+    // Analyser toutes les 1.5 secondes pour ne pas figer le navigateur
+    detectionIntervalId = setInterval(async () => {
+        if (!mobileNetModel || !cocoSsdModel) return;
+        
+        try {
+            const detectedIngredients = new Set();
+            const promises = [];
+            
+            // 1. Analyse MobileNet
+            if (mobileNetModel) {
+                promises.push(
+                    mobileNetModel.classify(videoElement).then(predictions => {
+                        predictions.forEach(p => {
+                            if (p.probability > 0.08) { // Lègèrement plus strict en temps réel
+                                if(window.translatePrediction) {
+                                    const translation = window.translatePrediction(p.className);
+                                    if (translation) detectedIngredients.add(translation);
+                                }
+                            }
+                        });
+                    }).catch(e => console.error("Erreur MobileNet:", e))
+                );
+            }
+            
+            // 2. Analyse COCO-SSD
+            if (cocoSsdModel) {
+                promises.push(
+                    cocoSsdModel.detect(videoElement).then(predictions => {
+                        predictions.forEach(p => {
+                            if (p.score > 0.4) {
+                                if(window.translatePrediction) {
+                                    const translation = window.translatePrediction(p.class);
+                                    if (translation) detectedIngredients.add(translation);
+                                }
+                            }
+                        });
+                    }).catch(e => console.error("Erreur COCO-SSD:", e))
+                );
+            }
+            
+            await Promise.all(promises);
+            
+            const ingredientsArray = Array.from(detectedIngredients);
+            
+            if (ingredientsArray.length > 0) {
+                // Envoyer à script.js, qui s'occupe de ne pas ajouter de doublons
+                if(window.addIngredients) {
+                    window.addIngredients(ingredientsArray);
+                }
+            }
+            
+        } catch (error) {
+            console.error("Erreur pendant le scan temps réel:", error);
+        }
+    }, 1500);
+};
+
+window.stopRealTimeDetection = function() {
+    if (detectionIntervalId) {
+        clearInterval(detectionIntervalId);
+        detectionIntervalId = null;
+    }
+    loadingIndicator.classList.add('hidden');
+    // Remettre le texte original
+    loadingIndicator.innerHTML = '<div class="spinner"></div><p>Analyse des ingrédients en cours...</p>';
+};
+
+// Analyser une image fixe (boutons ou upload)
 window.analyzeImage = async function(imgElement) {
     if (!mobileNetModel && !cocoSsdModel) {
         alert("Les modèles d'IA sont en cours de chargement. Veuillez patienter un instant.");
         await loadModels();
         if(!mobileNetModel && !cocoSsdModel) {
-            alert("Erreur de chargement des modèles. Veuillez vérifier votre connexion 인터넷.");
+            alert("Erreur de chargement des modèles. Veuillez vérifier votre connexion.");
             return;
         }
     }
@@ -59,16 +137,13 @@ window.analyzeImage = async function(imgElement) {
     loadingIndicator.classList.remove('hidden');
     
     try {
-        const detectedIngredients = new Set(); // Utiliser un Set pour éviter les doublons automatiquement
+        const detectedIngredients = new Set();
         const promises = [];
         
-        // 1. Analyse avec MobileNet (Bon pour l'objet dominant)
         if (mobileNetModel) {
             promises.push(
                 mobileNetModel.classify(imgElement).then(predictions => {
-                    console.log("Prédictions MobileNet:", predictions);
                     predictions.forEach(p => {
-                        // On abaisse un peu le seuil pour capter plus de choses
                         if (p.probability > 0.05) {
                             if(window.translatePrediction) {
                                 const translation = window.translatePrediction(p.className);
@@ -80,13 +155,10 @@ window.analyzeImage = async function(imgElement) {
             );
         }
         
-        // 2. Analyse avec COCO-SSD (Bon pour les frigos avec de multiples objets)
         if (cocoSsdModel) {
             promises.push(
                 cocoSsdModel.detect(imgElement).then(predictions => {
-                    console.log("Prédictions COCO-SSD:", predictions);
                     predictions.forEach(p => {
-                        // COCO-SSD est généralement très confiant quand il trouve quelque chose
                         if (p.score > 0.3) {
                             if(window.translatePrediction) {
                                 const translation = window.translatePrediction(p.class);
@@ -98,7 +170,6 @@ window.analyzeImage = async function(imgElement) {
             );
         }
         
-        // Attendre que les deux modèles aient terminé
         await Promise.all(promises);
         
         loadingIndicator.classList.add('hidden');
@@ -106,7 +177,6 @@ window.analyzeImage = async function(imgElement) {
         const ingredientsArray = Array.from(detectedIngredients);
         
         if (ingredientsArray.length > 0) {
-            // Envoyer à script.js
             if(window.addIngredients) {
                 window.addIngredients(ingredientsArray);
             }
