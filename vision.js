@@ -53,12 +53,17 @@ window.startRealTimeDetection = function(videoElement) {
     if (detectionIntervalId) clearInterval(detectionIntervalId);
     
     // On met à jour l'UI pour montrer que le scan est en cours
-    loadingIndicator.innerHTML = '<div class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></div><p style="font-size: 0.8rem;">Dètection temps réel active...</p>';
+    loadingIndicator.innerHTML = '<div class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></div><p style="font-size: 0.8rem;">Analyse fluide en continu...</p>';
     loadingIndicator.classList.remove('hidden');
     
-    // Analyser toutes les 1.5 secondes pour ne pas figer le navigateur
+    // Un booléen pour éviter d'empiler les scans si le téléphone rame
+    let isProcessing = false;
+    
+    // 300ms au lieu de 1500ms pour une vraie sensation de temps réel fluide
     detectionIntervalId = setInterval(async () => {
-        if (!mobileNetModel || !cocoSsdModel) return;
+        if (!mobileNetModel || !cocoSsdModel || isProcessing) return;
+        
+        isProcessing = true;
         
         try {
             const detectedIngredients = new Set();
@@ -69,7 +74,7 @@ window.startRealTimeDetection = function(videoElement) {
                 promises.push(
                     mobileNetModel.classify(videoElement).then(predictions => {
                         predictions.forEach(p => {
-                            if (p.probability > 0.08) { // Lègèrement plus strict en temps réel
+                            if (p.probability > 0.1) { // Lègèrement plus strict pour éviter les faux positifs du mouvement
                                 if(window.translatePrediction) {
                                     const translation = window.translatePrediction(p.className);
                                     if (translation) detectedIngredients.add(translation);
@@ -80,12 +85,13 @@ window.startRealTimeDetection = function(videoElement) {
                 );
             }
             
-            // 2. Analyse COCO-SSD
+            // 2. Analyse COCO-SSD (Spécialisé pour attraper tout le contenu du frigo)
             if (cocoSsdModel) {
                 promises.push(
                     cocoSsdModel.detect(videoElement).then(predictions => {
                         predictions.forEach(p => {
-                            if (p.score > 0.4) {
+                            // On prend même les probabilités moyennes (25%) car en vidéo on bouge
+                            if (p.score > 0.25) {
                                 if(window.translatePrediction) {
                                     const translation = window.translatePrediction(p.class);
                                     if (translation) detectedIngredients.add(translation);
@@ -109,8 +115,10 @@ window.startRealTimeDetection = function(videoElement) {
             
         } catch (error) {
             console.error("Erreur pendant le scan temps réel:", error);
+        } finally {
+            isProcessing = false;
         }
-    }, 1500);
+    }, 300); // Exécution rapide
 };
 
 window.stopRealTimeDetection = function() {
