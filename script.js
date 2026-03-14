@@ -170,12 +170,32 @@ function generateMenu() {
         };
     });
     
-    // Trier par score (décroissant)
-    evaluatedRecipes.sort((a, b) => b.matchScore - a.matchScore);
+    // Filtrer pour ne garder que les recettes qu'on peut raisonnablement faire 
+    // Règle: L'utilisateur a au minimum 50% des ingrédients requis (donc min 50% de matchScore)
+    // Et max 2 ingrédients manquants pour que ça soit réaliste.
+    const achievableRecipes = evaluatedRecipes.filter(r => 
+        r.matchScore >= 0.5 && 
+        (r.ingredientCount - r.matchCount) <= 2
+    );
     
-    // Prendre les 7 meilleures (ou moins si on n'a pas 7 recettes)
-    // Pour varier, on prend parmi les 15 meilleures et on mélange un peu si on a beaucoup d'ingrédients
-    const topCandidates = evaluatedRecipes.slice(0, Math.max(7, evaluatedRecipes.length));
+    // Si on a aucune recette possible
+    if (achievableRecipes.length === 0) {
+        menuSection.classList.remove('hidden');
+        daysContainer.innerHTML = `
+            <div style="text-align:center; padding: 2rem; color: #ff3b30; background: #FFF0E6; border-radius: 12px; margin-top:1rem;">
+                <i data-lucide="alert-triangle" style="width: 32px; height: 32px; margin-bottom: 0.5rem"></i>
+                <h3 style="margin-bottom: 0.5rem">Oups, il vous manque des ingrédients !</h3>
+                <p>Même avec nos recettes les plus simples, vous n'avez pas assez d'aliments pour générer des repas.</p>
+                <p style="margin-top: 0.5rem; font-size: 0.85rem">Essayez de prendre en photo plusieurs items de votre frigo ou d'ajouter manuellement (sel, beurre, huile, etc...).</p>
+            </div>
+        `;
+        if(window.lucide) { lucide.createIcons(); }
+        menuSection.scrollIntoView({ behavior: 'smooth' });
+        return;
+    }
+    
+    // Prendre les 7 meilleures (ou moins si on n'a pas 7 recettes réalisables)
+    const topCandidates = achievableRecipes.slice(0, Math.max(7, achievableRecipes.length));
     
     // Fisher-Yates shuffle pour ne pas toujours avoir exactement les mêmes repas les mêmes jours si le score est similaire
     for (let i = topCandidates.length - 1; i > 0; i--) {
@@ -183,7 +203,7 @@ function generateMenu() {
         [topCandidates[i], topCandidates[j]] = [topCandidates[j], topCandidates[i]];
     }
     
-    // Prendre 7
+    // Prendre 7 (si on en a 7, sinon ça prendra ce qu'il y a)
     const finalMenu = topCandidates.slice(0, 7);
     
     saveMenu(finalMenu);
@@ -273,8 +293,12 @@ window.regenerateDay = function(index) {
         };
     });
     
-    // Filtrer celles qui ne sont pas dans le menu actuel
-    const availableRecipes = evaluatedRecipes.filter(r => !currentIds.includes(r.id));
+    // Filtrer: réalisables ET pas dans le menu actuel
+    const availableRecipes = evaluatedRecipes.filter(r => 
+        !currentIds.includes(r.id) && 
+        r.matchScore >= 0.5 && 
+        (r.ingredientCount - r.matchCount) <= 2
+    );
     
     if(availableRecipes.length > 0) {
         // Trier par score
