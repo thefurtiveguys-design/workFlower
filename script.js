@@ -1,318 +1,328 @@
-// script.js
+// Variables globales
+let peer;
+let connection;
+let myPeerId;
 
-// État de l'application
-let userIngredients = [];
-const savedIngredients = localStorage.getItem('placard_ingredients');
-if (savedIngredients) {
-    userIngredients = JSON.parse(savedIngredients);
+// Éléments du DOM
+const connectionScreen = document.getElementById('connection-screen');
+const chatScreen = document.getElementById('chat-screen');
+const myPeerIdElement = document.getElementById('my-peer-id');
+const copyIdBtn = document.getElementById('copy-id-btn');
+const idStatus = document.getElementById('id-status');
+const remotePeerIdInput = document.getElementById('remote-peer-id');
+const connectBtn = document.getElementById('connect-btn');
+const connectedPeerIdElement = document.getElementById('connected-peer-id');
+const disconnectBtn = document.getElementById('disconnect-btn');
+const messagesList = document.getElementById('messages-list');
+const messageInput = document.getElementById('message-input');
+const sendBtn = document.getElementById('send-btn');
+const connectionIndicator = document.getElementById('connection-indicator');
+const messagesContainer = document.getElementById('messages-container');
+
+// Initialisation de PeerJS avec le serveur gratuit
+function initializePeer() {
+    // Utilisation du serveur de signalisation gratuit de PeerJS
+    peer = new Peer(undefined, {
+        host: '0.peerjs.com',
+        port: 443,
+        secure: true,
+        debug: 1
+    });
+
+    // Quand la connexion au serveur est établie
+    peer.on('open', (id) => {
+        myPeerId = id;
+        myPeerIdElement.textContent = id;
+        copyIdBtn.disabled = false;
+        idStatus.textContent = '✅ Connecté au serveur - Partagez votre ID !';
+        idStatus.className = 'id-status connected';
+        console.log('Mon Peer ID:', id);
+    });
+
+    // Gestion des erreurs
+    peer.on('error', (error) => {
+        console.error('Erreur PeerJS:', error);
+        let errorMessage = 'Erreur de connexion au serveur';
+        
+        switch(error.type) {
+            case 'browser-incompatible':
+                errorMessage = 'Navigateur incompatible';
+                break;
+            case 'disconnected':
+                errorMessage = 'Déconnecté du serveur';
+                break;
+            case 'invalid-id':
+                errorMessage = 'ID invalide';
+                break;
+            case 'network':
+                errorMessage = 'Erreur réseau - Vérifiez votre connexion internet';
+                break;
+            case 'peer-unavailable':
+                errorMessage = 'Le destinataire n\'est pas disponible';
+                break;
+            case 'server-error':
+                errorMessage = 'Erreur du serveur de signalisation';
+                break;
+            case 'socket-error':
+                errorMessage = 'Erreur de socket';
+                break;
+            case 'unavailable-id':
+                errorMessage = 'Cet ID est déjà utilisé';
+                break;
+            case 'webrtc':
+                errorMessage = 'Erreur WebRTC';
+                break;
+        }
+        
+        idStatus.textContent = `❌ ${errorMessage}`;
+        idStatus.className = 'id-status';
+        showSystemMessage(`Erreur: ${errorMessage}`);
+    });
+
+    // Reconnexion automatique
+    peer.on('disconnected', () => {
+        idStatus.textContent = '🔄 Reconnexion au serveur...';
+        idStatus.className = 'id-status';
+        peer.reconnect();
+    });
+
+    // Quand quelqu'un se connecte à nous
+    peer.on('connection', (conn) => {
+        if (connection) {
+            // On refuse les connexions multiples
+            conn.close();
+            return;
+        }
+        
+        setupConnection(conn);
+        switchToChatScreen();
+        showSystemMessage('Un utilisateur s\'est connecté à vous !');
+    });
+
+    // Fermeture propre
+    window.addEventListener('beforeunload', () => {
+        if (connection) {
+            connection.close();
+        }
+        peer.destroy();
+    });
 }
 
-// Éléments DOM
-const ingredientsList = document.getElementById('ingredients-list');
-const emptyIngredientsMsg = document.getElementById('empty-ingredients');
-const ingredientsCountBadge = document.getElementById('ingredients-count');
-const manualIngredientInput = document.getElementById('manual-ingredient');
-const addIngredientBtn = document.getElementById('add-ingredient-btn');
-const generateMenuBtn = document.getElementById('generate-menu-btn');
-const menuSection = document.getElementById('menu-section');
-const daysContainer = document.getElementById('days-container');
+// Configuration de la connexion
+function setupConnection(conn) {
+    connection = conn;
 
-// Jours de la semaine
-const joursSemaine = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+    conn.on('open', () => {
+        console.log('Connexion établie avec:', conn.peer);
+        connectedPeerIdElement.textContent = conn.peer;
+        connectionIndicator.classList.remove('disconnected');
+        showSystemMessage(`✅ Connecté à ${conn.peer.substring(0, 8)}...`);
+    });
 
-// Initialisation
-window.addEventListener('DOMContentLoaded', () => {
-    renderIngredients();
+    // Réception des messages
+    conn.on('data', (data) => {
+        if (data.type === 'message') {
+            addMessage(data.content, 'received', data.timestamp);
+        }
+    });
+
+    conn.on('close', () => {
+        handleDisconnection();
+    });
+
+    conn.on('error', (error) => {
+        console.error('Erreur de connexion:', error);
+        showSystemMessage('Erreur de connexion avec le pair');
+    });
+}
+
+// Connexion à un pair
+function connectToPeer() {
+    const remoteId = remotePeerIdInput.value.trim();
     
-    if (addIngredientBtn) {
-        addIngredientBtn.addEventListener('click', handleManualAdd);
+    if (!remoteId) {
+        alert('Veuillez entrer un ID de destinataire');
+        return;
+    }
+
+    if (remoteId === myPeerId) {
+        alert('Vous ne pouvez pas vous connecter à vous-même !');
+        return;
+    }
+
+    if (connection) {
+        alert('Vous êtes déjà connecté à quelqu\'un');
+        return;
+    }
+
+    idStatus.textContent = '🔄 Tentative de connexion...';
+    idStatus.className = 'id-status';
+    connectBtn.disabled = true;
+
+    const conn = peer.connect(remoteId, {
+        reliable: true
+    });
+
+    conn.on('open', () => {
+        setupConnection(conn);
+        switchToChatScreen();
+        showSystemMessage(`✅ Connecté à ${remoteId.substring(0, 8)}...`);
+        connectBtn.disabled = false;
+    });
+
+    conn.on('error', (error) => {
+        console.error('Erreur de connexion:', error);
+        idStatus.textContent = '❌ Échec de la connexion - ID invalide ou utilisateur non disponible';
+        idStatus.className = 'id-status';
+        connectBtn.disabled = false;
+        alert('Impossible de se connecter. Vérifiez l\'ID et assurez-vous que votre ami est connecté.');
+    });
+}
+
+// Envoi de message
+function sendMessage() {
+    const content = messageInput.value.trim();
+    
+    if (!content || !connection) {
+        return;
+    }
+
+    const messageData = {
+        type: 'message',
+        content: content,
+        timestamp: new Date().toISOString()
+    };
+
+    connection.send(messageData);
+    addMessage(content, 'sent', messageData.timestamp);
+    messageInput.value = '';
+    messageInput.focus();
+}
+
+// Ajout de message à l'interface
+function addMessage(content, type, timestamp) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${type}`;
+    
+    const time = new Date(timestamp);
+    const timeString = time.toLocaleTimeString('fr-FR', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+    });
+    
+    messageDiv.innerHTML = `
+        ${content}
+        <div class="message-time">${timeString}</div>
+    `;
+    
+    messagesList.appendChild(messageDiv);
+    scrollToBottom();
+}
+
+// Message système
+function showSystemMessage(content) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message system';
+    messageDiv.textContent = content;
+    messagesList.appendChild(messageDiv);
+    scrollToBottom();
+}
+
+// Scroll automatique vers le bas
+function scrollToBottom() {
+    setTimeout(() => {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }, 100);
+}
+
+// Changement d'écran
+function switchToChatScreen() {
+    connectionScreen.classList.remove('active');
+    chatScreen.classList.add('active');
+    messageInput.focus();
+}
+
+function switchToConnectionScreen() {
+    chatScreen.classList.remove('active');
+    connectionScreen.classList.add('active');
+    messagesList.innerHTML = '';
+}
+
+// Gestion de la déconnexion
+function handleDisconnection() {
+    if (connection) {
+        connection.close();
+        connection = null;
     }
     
-    if (manualIngredientInput) {
-        manualIngredientInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleManualAdd();
-        });
+    connectionIndicator.classList.add('disconnected');
+    connectedPeerIdElement.textContent = 'Personne';
+    switchToConnectionScreen();
+    idStatus.textContent = '✅ Connecté au serveur - Partagez votre ID !';
+    idStatus.className = 'id-status connected';
+}
+
+// Déconnexion manuelle
+function disconnect() {
+    if (connection) {
+        showSystemMessage('Vous vous êtes déconnecté');
+        handleDisconnection();
     }
+}
+
+// Copie de l'ID
+function copyPeerId() {
+    if (!myPeerId) return;
     
-    if (generateMenuBtn) {
-        generateMenuBtn.addEventListener('click', generateMenu);
-    }
-    
-    // Restaurer le menu s'il existe
-    const savedMenu = localStorage.getItem('placard_menu');
-    if (savedMenu && userIngredients.length > 0) {
-        renderMenu(JSON.parse(savedMenu));
+    navigator.clipboard.writeText(myPeerId).then(() => {
+        copyIdBtn.textContent = '✅ Copié !';
+        copyIdBtn.classList.add('copied');
+        
+        setTimeout(() => {
+            copyIdBtn.textContent = '📋 Copier';
+            copyIdBtn.classList.remove('copied');
+        }, 2000);
+    }).catch(err => {
+        console.error('Erreur lors de la copie:', err);
+        // Fallback pour les navigateurs qui ne supportent pas clipboard API
+        const textArea = document.createElement('textarea');
+        textArea.value = myPeerId;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        copyIdBtn.textContent = '✅ Copié !';
+        copyIdBtn.classList.add('copied');
+        setTimeout(() => {
+            copyIdBtn.textContent = '📋 Copier';
+            copyIdBtn.classList.remove('copied');
+        }, 2000);
+    });
+}
+
+// Écouteurs d'événements
+connectBtn.addEventListener('click', connectToPeer);
+disconnectBtn.addEventListener('click', disconnect);
+copyIdBtn.addEventListener('click', copyPeerId);
+sendBtn.addEventListener('click', sendMessage);
+
+messageInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
     }
 });
 
-// Appelé par vision.js
-window.addIngredients = function(newIngredients) {
-    let countAdded = 0;
-    newIngredients.forEach(ing => {
-        if (!userIngredients.includes(ing)) {
-            userIngredients.push(ing);
-            countAdded++;
-        }
-    });
-    
-    if(countAdded > 0) {
-        saveIngredients();
-        renderIngredients();
+remotePeerIdInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        connectToPeer();
     }
-};
+});
 
-function handleManualAdd() {
-    const val = manualIngredientInput.value.trim();
-    if (val) {
-        // Ajouter un emoji par défaut si non fourni
-        const hasEmoji = /\p{Emoji}/u.test(val);
-        const formattedVal = hasEmoji ? val : `🛒 ${val.charAt(0).toUpperCase() + val.slice(1)}`;
-        
-        if (!userIngredients.includes(formattedVal)) {
-            userIngredients.push(formattedVal);
-            saveIngredients();
-            renderIngredients();
-        }
-        manualIngredientInput.value = '';
-    }
-}
+// Empêcher la soumission du formulaire si présent
+document.addEventListener('submit', (e) => e.preventDefault());
 
-function removeIngredient(ing) {
-    userIngredients = userIngredients.filter(i => i !== ing);
-    saveIngredients();
-    renderIngredients();
-}
-
-function saveIngredients() {
-    localStorage.setItem('placard_ingredients', JSON.stringify(userIngredients));
-}
-
-function renderIngredients() {
-    // Vider la liste
-    ingredientsList.innerHTML = '';
-    
-    if (userIngredients.length === 0) {
-        ingredientsList.appendChild(emptyIngredientsMsg);
-        emptyIngredientsMsg.classList.remove('hidden');
-        generateMenuBtn.disabled = true;
-        ingredientsCountBadge.textContent = "0";
-        ingredientsCountBadge.className = "badge badge-neutral";
-        return;
-    }
-    
-    // Mettre à jour le badge
-    ingredientsCountBadge.textContent = userIngredients.length;
-    if (userIngredients.length > 5) {
-        ingredientsCountBadge.className = "badge badge-green";
-    } else {
-        ingredientsCountBadge.className = "badge badge-orange";
-    }
-    
-    emptyIngredientsMsg.classList.add('hidden');
-    generateMenuBtn.disabled = false;
-    
-    userIngredients.forEach(ing => {
-        const li = document.createElement('li');
-        li.className = 'ingredient-tag';
-        
-        const span = document.createElement('span');
-        span.textContent = ing;
-        
-        const btn = document.createElement('button');
-        btn.innerHTML = '<i data-lucide="x" style="width: 14px; height: 14px;"></i>';
-        btn.onclick = () => removeIngredient(ing);
-        
-        li.appendChild(span);
-        li.appendChild(btn);
-        ingredientsList.appendChild(li);
-    });
-    
-    // Refresh Lucide icons for newly added elements
-    if(window.lucide) {
-        lucide.createIcons();
-    }
-}
-
-// Logique de génération de menu
-function calculateMatchScore(recipeIngredients, userIngs) {
-    let matchCount = 0;
-    
-    // Normalisation pour comparer (enlever emojis et mettre en minuscule)
-    const normalize = str => str.toLowerCase().replace(/[\u1000-\uFFFF]|\uD83C[\uDF00-\uDFFF]|\uD83D[\uDC00-\uDDFF]|\p{Emoji}/gu, '').trim();
-    const normalizedUser = userIngs.map(normalize);
-    
-    recipeIngredients.forEach(reqIng => {
-        const normalizedMatched = normalize(reqIng);
-        
-        // Vérifier si un des ingrédients de l'utilisateur correspond ou est contenu (ex: "Tomate" dans "Tomates cerises")
-        const isMatch = normalizedUser.some(u => normalizedMatched.includes(u) || u.includes(normalizedMatched));
-        if(isMatch) matchCount++;
-    });
-    
-    return {
-        score: matchCount / recipeIngredients.length, // Pourcentage de correspondance
-        matches: matchCount,
-        total: recipeIngredients.length
-    };
-}
-
-function generateMenu() {
-    if (userIngredients.length === 0) return;
-    
-    // Évaluer toutes les recettes
-    const evaluatedRecipes = recipes.map(recipe => {
-        const matchData = calculateMatchScore(recipe.ingredients, userIngredients);
-        return {
-            ...recipe,
-            matchScore: matchData.score,
-            matchCount: matchData.matches,
-            ingredientCount: matchData.total
-        };
-    });
-    
-    // Filtrer pour ne garder que les recettes qu'on peut raisonnablement faire 
-    // Règle: L'utilisateur a au minimum 50% des ingrédients requis (donc min 50% de matchScore)
-    // Et max 2 ingrédients manquants pour que ça soit réaliste.
-    const achievableRecipes = evaluatedRecipes.filter(r => 
-        r.matchScore >= 0.5 && 
-        (r.ingredientCount - r.matchCount) <= 2
-    );
-    
-    // Si on a aucune recette possible
-    if (achievableRecipes.length === 0) {
-        menuSection.classList.remove('hidden');
-        daysContainer.innerHTML = `
-            <div style="text-align:center; padding: 2rem; color: #ff3b30; background: #FFF0E6; border-radius: 12px; margin-top:1rem;">
-                <i data-lucide="alert-triangle" style="width: 32px; height: 32px; margin-bottom: 0.5rem"></i>
-                <h3 style="margin-bottom: 0.5rem">Oups, il vous manque des ingrédients !</h3>
-                <p>Même avec nos recettes les plus simples, vous n'avez pas assez d'aliments pour générer des repas.</p>
-                <p style="margin-top: 0.5rem; font-size: 0.85rem">Essayez de prendre en photo plusieurs items de votre frigo ou d'ajouter manuellement (sel, beurre, huile, etc...).</p>
-            </div>
-        `;
-        if(window.lucide) { lucide.createIcons(); }
-        menuSection.scrollIntoView({ behavior: 'smooth' });
-        return;
-    }
-    
-    // Prendre les 7 meilleures (ou moins si on n'a pas 7 recettes réalisables)
-    const topCandidates = achievableRecipes.slice(0, Math.max(7, achievableRecipes.length));
-    
-    // Fisher-Yates shuffle pour ne pas toujours avoir exactement les mêmes repas les mêmes jours si le score est similaire
-    for (let i = topCandidates.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [topCandidates[i], topCandidates[j]] = [topCandidates[j], topCandidates[i]];
-    }
-    
-    // Prendre 7 (si on en a 7, sinon ça prendra ce qu'il y a)
-    const finalMenu = topCandidates.slice(0, 7);
-    
-    saveMenu(finalMenu);
-    renderMenu(finalMenu);
-    
-    // Scroll au menu
-    menuSection.scrollIntoView({ behavior: 'smooth' });
-}
-
-function saveMenu(menu) {
-    localStorage.setItem('placard_menu', JSON.stringify(menu));
-}
-
-function renderMenu(menu) {
-    menuSection.classList.remove('hidden');
-    daysContainer.innerHTML = '';
-    
-    const normalize = str => str.toLowerCase().replace(/[\u1000-\uFFFF]|\uD83C[\uDF00-\uDFFF]|\uD83D[\uDC00-\uDDFF]|\p{Emoji}/gu, '').trim();
-    
-    menu.forEach((recipe, index) => {
-        const dayName = joursSemaine[Math.min(index, 6)];
-        
-        // Formatter les ingrédients (barrés si manquants)
-        const ingredientsHtml = recipe.ingredients.map(ing => {
-            const normalizedIng = normalize(ing);
-            const normalizedUser = userIngredients.map(normalize);
-            
-            const isMissing = !normalizedUser.some(u => normalizedIng.includes(u) || u.includes(normalizedIng));
-            return `<span class="${isMissing ? 'ingredient-missing' : ''}">${ing}</span>`;
-        }).join(', ');
-        
-        // Couleur du badge
-        const percentage = Math.round((recipe.matchCount / recipe.ingredientCount) * 100) || 0;
-        let badgeClass = 'badge-neutral';
-        if (percentage >= 80) badgeClass = 'badge-green';
-        else if (percentage >= 50) badgeClass = 'badge-orange';
-        
-        const cardHtml = `
-            <div class="day-card" data-index="${index}">
-                <div class="day-header">
-                    <span>${dayName}</span>
-                    <button class="regenerate-btn" onclick="regenerateDay(${index})" title="Changer de recette">
-                        <i data-lucide="refresh-cw" style="width: 16px; height: 16px;"></i>
-                    </button>
-                </div>
-                <div class="recipe-content">
-                    <div class="recipe-image">${recipe.image}</div>
-                    <div class="recipe-info">
-                        <div class="recipe-title">${recipe.title}</div>
-                        <div class="recipe-meta">
-                            <span><i data-lucide="clock" style="width: 14px; height: 14px;"></i> ${recipe.time}</span>
-                            <span><i data-lucide="chef-hat" style="width: 14px; height: 14px;"></i> ${recipe.difficulty}</span>
-                            <span class="badge ${badgeClass}">${recipe.matchCount}/${recipe.ingredientCount} poss.</span>
-                        </div>
-                        <div class="recipe-ingredients">
-                            ${ingredientsHtml}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        daysContainer.insertAdjacentHTML('beforeend', cardHtml);
-    });
-    
-    if(window.lucide) {
-        lucide.createIcons();
-    }
-}
-
-// Global scope pour pouvoir être appelé depuis l'HTML
-window.regenerateDay = function(index) {
-    const currentMenu = JSON.parse(localStorage.getItem('placard_menu')) || [];
-    if(currentMenu.length === 0) return;
-    
-    // Obtenir les IDs des recettes déjà dans le menu
-    const currentIds = currentMenu.map(r => r.id);
-    
-    // Évaluer toutes les recettes
-    const evaluatedRecipes = recipes.map(recipe => {
-        const matchData = calculateMatchScore(recipe.ingredients, userIngredients);
-        return {
-            ...recipe,
-            matchScore: matchData.score,
-            matchCount: matchData.matches,
-            ingredientCount: matchData.total
-        };
-    });
-    
-    // Filtrer: réalisables ET pas dans le menu actuel
-    const availableRecipes = evaluatedRecipes.filter(r => 
-        !currentIds.includes(r.id) && 
-        r.matchScore >= 0.5 && 
-        (r.ingredientCount - r.matchCount) <= 2
-    );
-    
-    if(availableRecipes.length > 0) {
-        // Trier par score
-        availableRecipes.sort((a, b) => b.matchScore - a.matchScore);
-        
-        // Prendre une des 3 meilleures aléatoirement
-        const randomTopIndex = Math.floor(Math.random() * Math.min(3, availableRecipes.length));
-        
-        // Remplacer dans le menu
-        currentMenu[index] = availableRecipes[randomTopIndex];
-        
-        saveMenu(currentMenu);
-        renderMenu(currentMenu);
-    } else {
-        alert("Nous n'avons pas d'autres recettes disponibles dans la base de données !");
-    }
-};
+// Initialisation
+initializePeer();
